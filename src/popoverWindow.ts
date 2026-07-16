@@ -4,6 +4,8 @@ import { join } from "node:path";
 const WIDTH = 272;
 const HEIGHT = 150;
 
+let lastHiddenAt = 0;
+
 export function createPopover(): BrowserWindow {
   const win = new BrowserWindow({
     width: WIDTH,
@@ -23,12 +25,13 @@ export function createPopover(): BrowserWindow {
     },
   });
   win.loadFile(join(__dirname, "popover.html"));
-  win.on("blur", () => { if (!win.isDestroyed()) { win.hide(); } });
+  win.on("blur", () => { if (!win.isDestroyed()) { lastHiddenAt = Date.now(); win.hide(); } });
   return win;
 }
 
 export function togglePopover(win: BrowserWindow, trayBounds: Electron.Rectangle): void {
-  if (win.isVisible()) { win.hide(); return; }
+  if (!win.isVisible() && Date.now() - lastHiddenAt < 250) { return; }
+  if (win.isVisible()) { lastHiddenAt = Date.now(); win.hide(); return; }
   const display = screen.getDisplayNearestPoint({ x: trayBounds.x, y: trayBounds.y });
   let x = Math.round(trayBounds.x + trayBounds.width / 2 - WIDTH / 2);
   const y = Math.round(trayBounds.y + trayBounds.height + 2);

@@ -1,4 +1,4 @@
-import type { ReadResult, QuotaWindow } from "./model";
+import type { QuotaWindow } from "./model";
 import type { UpdatePayload } from "./preload";
 
 declare global {
@@ -37,7 +37,7 @@ function rowHtml(label: string, w: QuotaWindow | null, nowSec: number): string {
       `<div class="track"></div><span class="pct">--%</span><span class="reset">--</span></div>`;
   }
   const pct = Math.round(w.usedPct);
-  const cls = colorClass(w.usedPct);
+  const cls = colorClass(pct);
   const width = Math.max(0, Math.min(100, w.usedPct));
   return `<div class="row">` +
     `<span class="label">${label}</span>` +
@@ -51,7 +51,7 @@ function rowHtml(label: string, w: QuotaWindow | null, nowSec: number): string {
 function draw(): void {
   if (!last) { return; }
   const rows = document.getElementById("rows")!;
-  const nowSec = Math.floor(last.nowSec + 0); // base; live tick advances below
+  const nowSec = last.nowSec;
   if (!last.result.ok) {
     rows.innerHTML = `<div class="unavailable">Quota unavailable (${last.result.reason})</div>`;
   } else {
