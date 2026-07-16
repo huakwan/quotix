@@ -5,11 +5,9 @@ import { trayTooltip } from "./ui/render";
 import { renderTray } from "./ui/trayCapture";
 import { ReadResult } from "./quota/model";
 import { loadQuotaCache, saveQuotaCache } from "./quota/cache";
-import { loadPrimary, savePrimary, Primary } from "./prefs";
 import { createPopover, togglePopover } from "./ui/popoverWindow";
 
 const REFRESH_INTERVAL_SECONDS = 60;
-const RENDER_TICK_SECONDS = 10;
 
 type OkResult = Extract<ReadResult, { ok: true }>;
 
@@ -19,7 +17,6 @@ let lastResult: ReadResult = { ok: false, reason: "missing" };
 let lastGood: OkResult | null = null;   // survives 429/network errors so the tray keeps showing numbers
 let lastError: string | undefined;      // set while the latest fetch is failing
 let pollTimer: NodeJS.Timeout | undefined;
-let primary: Primary = "session";
 
 function describeError(e: string | undefined): string {
   if (e === "HTTP 429") { return "rate limited"; }
@@ -43,7 +40,7 @@ function render(): void {
   tray.setToolTip(tooltip(nowSec));
   if (popover && !popover.isDestroyed()) {
     // Feed the popover the last-good data too, so it shows numbers rather than "unavailable".
-    popover.webContents.send("quota:update", { result: lastGood ?? lastResult, primary, nowSec, stale });
+    popover.webContents.send("quota:update", { result: lastGood ?? lastResult, nowSec, stale });
   }
 }
 
@@ -94,7 +91,6 @@ const contextMenu = Menu.buildFromTemplate([
 
 app.whenReady().then(() => {
   app.dock?.hide();
-  primary = loadPrimary();
 
   // Seed from the on-disk cache so the tray shows real (stale) numbers before the first poll.
   const cached = loadQuotaCache();
@@ -106,17 +102,11 @@ app.whenReady().then(() => {
   tray.on("click", () => { if (popover && tray) { togglePopover(popover, tray.getBounds()); } });
   tray.on("right-click", () => { tray?.popUpContextMenu(contextMenu); });
 
-  ipcMain.on("quota:setPrimary", (_e, p: Primary) => {
-    primary = p === "weekly" ? "weekly" : "session";
-    savePrimary(primary);
-    render();
-  });
   ipcMain.on("quota:refresh", () => void poll());
   ipcMain.on("quota:quit", () => app.quit());
 
   render();
   void poll();
-  setInterval(render, RENDER_TICK_SECONDS * 1000);
   nativeTheme.on("updated", render); // re-tint tray text on light/dark switch
 });
 

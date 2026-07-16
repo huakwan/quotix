@@ -1,5 +1,5 @@
-import { BrowserWindow, NativeImage, nativeImage, screen } from "electron";
 import anthropicIcon from "../../assets/anthropic.svg";
+import { BrowserWindow, NativeImage, nativeImage, screen } from "electron";
 
 // Renders the tray's inline row (5H [bar] % | 7D [bar] %) with the real system
 // font by laying it out in a hidden BrowserWindow and capturing it to a NativeImage.
@@ -23,7 +23,7 @@ const PAGE = `
   .label { opacity: 0.7; }
   .pct { font-variant-numeric: tabular-nums; }
   .track {
-    width: 30px; height: 6px; border-radius: 3px;
+    display: inline-flex; width: 60px; height: 6px; border-radius: 3px;
     background: rgba(140, 140, 145, 0.35); overflow: hidden;
   }
   .fill { height: 100%; border-radius: 3px; width: 0%; }
@@ -47,7 +47,7 @@ const PAGE = `
   window.__render = function(s, w, dark, stale){
     document.documentElement.style.color = dark ? '#f2f2f2' : '#1c1c1e';
     var row = document.getElementById('row');
-    row.style.opacity = stale ? '0.45' : '1';
+    row.style.opacity = stale ? '0.65' : '1';
     seg('fs', 'ps', s); seg('fw', 'pw', w);
     return Math.ceil(row.getBoundingClientRect().width);
   };

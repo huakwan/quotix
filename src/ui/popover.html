@@ -12,15 +12,12 @@
     --green: #35c759;
     --amber: #ffcc00;
     --red: #ff453a;
-    --chip: rgba(255, 255, 255, 0.10);
-    --chip-on: rgba(255, 255, 255, 0.28);
   }
   @media (prefers-color-scheme: light) {
     :root {
       --bg: rgba(250, 250, 250, 0.96);
       --fg: #1c1c1e; --muted: #6b6b70;
       --track: rgba(0, 0, 0, 0.12);
-      --chip: rgba(0, 0, 0, 0.08); --chip-on: rgba(0, 0, 0, 0.22);
     }
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -47,8 +44,6 @@
   .pct { font-variant-numeric: tabular-nums; min-width: 30px; text-align: right; }
   .reset { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; }
   .footer { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
-  .chip { background: var(--chip); border: 0; color: var(--fg); border-radius: 6px; padding: 3px 10px; font: inherit; font-weight: 600; cursor: pointer; }
-  .chip.on { background: var(--chip-on); }
   .spacer { flex: 1; }
   .icon-btn { background: none; border: 0; color: var(--muted); font-size: 14px; cursor: pointer; padding: 2px 6px; }
   .icon-btn:hover { color: var(--fg); }
@@ -61,8 +56,6 @@
     <div class="header"><span class="logo">✳</span><span>Claude</span></div>
     <div id="rows"></div>
     <div class="footer">
-      <button class="chip" id="chip-session" data-primary="session">5h</button>
-      <button class="chip" id="chip-weekly" data-primary="weekly">7d</button>
       <span class="spacer"></span>
       <button class="icon-btn" id="refresh" title="Refresh now">↻</button>
       <button class="icon-btn" id="quit" title="Quit">⏻</button>

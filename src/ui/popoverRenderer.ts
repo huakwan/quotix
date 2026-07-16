@@ -5,7 +5,6 @@ declare global {
   interface Window {
     quotix: {
       onUpdate(cb: (p: UpdatePayload) => void): void;
-      setPrimary(p: "session" | "weekly"): void;
       refresh(): void;
       quit(): void;
     };
@@ -59,14 +58,10 @@ function draw(): void {
       rowHtml("5h", last.result.quota.session, nowSec) +
       rowHtml("Wk", last.result.quota.weekly, nowSec);
   }
-  document.getElementById("chip-session")!.classList.toggle("on", last.primary === "session");
-  document.getElementById("chip-weekly")!.classList.toggle("on", last.primary === "weekly");
 }
 
 window.quotix.onUpdate((p) => { last = p; draw(); });
 
-document.getElementById("chip-session")!.addEventListener("click", () => window.quotix.setPrimary("session"));
-document.getElementById("chip-weekly")!.addEventListener("click", () => window.quotix.setPrimary("weekly"));
 document.getElementById("refresh")!.addEventListener("click", () => window.quotix.refresh());
 document.getElementById("quit")!.addEventListener("click", () => window.quotix.quit());
 
