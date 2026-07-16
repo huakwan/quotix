@@ -1,4 +1,4 @@
-import type { QuotaWindow } from "./model";
+import type { QuotaWindow } from "../quota/model";
 import type { UpdatePayload } from "./preload";
 
 declare global {

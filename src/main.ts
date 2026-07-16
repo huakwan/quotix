@@ -1,10 +1,10 @@
 import { app, Tray, Menu, nativeImage, ipcMain, BrowserWindow } from "electron";
-import { createCachedTokenProvider } from "./oauthCredentials";
-import { fetchOAuthQuota } from "./oauthSource";
-import { trayTitle, trayTooltip } from "./render";
-import { ReadResult } from "./model";
+import { createCachedTokenProvider } from "./quota/oauthCredentials";
+import { fetchOAuthQuota } from "./quota/oauthSource";
+import { trayTitle, trayTooltip } from "./ui/render";
+import { ReadResult } from "./quota/model";
 import { loadPrimary, savePrimary, Primary } from "./prefs";
-import { createPopover, togglePopover } from "./popoverWindow";
+import { createPopover, togglePopover } from "./ui/popoverWindow";
 
 const REFRESH_INTERVAL_SECONDS = 60;
 const RENDER_TICK_SECONDS = 10;

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { ReadResult } from "./model";
+import type { ReadResult } from "../quota/model";
 
 export interface UpdatePayload {
   result: ReadResult;

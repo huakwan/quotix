@@ -8,7 +8,7 @@ const copyHtml = {
     const { mkdirSync } = require("node:fs");
     build.onEnd(() => {
       mkdirSync("dist", { recursive: true });
-      copyFileSync("src/popover.html", "dist/popover.html");
+      copyFileSync("src/ui/popover.html", "dist/popover.html");
     });
   },
 };
@@ -20,9 +20,9 @@ async function main() {
   };
   const contexts = await Promise.all([
     esbuild.context({ ...node, entryPoints: ["src/main.ts"], outfile: "dist/main.js" }),
-    esbuild.context({ ...node, entryPoints: ["src/preload.ts"], outfile: "dist/preload.js" }),
+    esbuild.context({ ...node, entryPoints: ["src/ui/preload.ts"], outfile: "dist/preload.js" }),
     esbuild.context({
-      entryPoints: ["src/popoverRenderer.ts"], outfile: "dist/popoverRenderer.js",
+      entryPoints: ["src/ui/popoverRenderer.ts"], outfile: "dist/popoverRenderer.js",
       bundle: true, format: "iife", platform: "browser", target: "es2020",
       sourcemap: true, logLevel: "info", plugins: [copyHtml],
     }),

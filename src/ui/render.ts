@@ -1,5 +1,5 @@
-import { QuotaWindow, ReadResult } from "./model";
-import { Primary } from "./prefs";
+import { QuotaWindow, ReadResult } from "../quota/model";
+import { Primary } from "../prefs";
 
 export function bar(pct: number, width: number): string {
   const clamped = Math.max(0, Math.min(100, pct));
