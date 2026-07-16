@@ -1,24 +1,31 @@
-import { app, Tray, Menu, nativeImage } from "electron";
+import { app, Tray, Menu, nativeImage, ipcMain, BrowserWindow } from "electron";
 import { createCachedTokenProvider } from "./oauthCredentials";
 import { fetchOAuthQuota } from "./oauthSource";
 import { trayTitle, trayTooltip } from "./render";
 import { ReadResult } from "./model";
+import { loadPrimary, savePrimary, Primary } from "./prefs";
+import { createPopover, togglePopover } from "./popoverWindow";
 
 const REFRESH_INTERVAL_SECONDS = 60;
 const RENDER_TICK_SECONDS = 10;
 const BAR_WIDTH = 10;
 
 let tray: Tray | undefined;
+let popover: BrowserWindow | undefined;
 let lastResult: ReadResult = { ok: false, reason: "missing" };
 let pollTimer: NodeJS.Timeout | undefined;
+let primary: Primary = "session";
 
 const tokenProvider = createCachedTokenProvider();
 
 function render(): void {
   if (!tray) { return; }
   const nowSec = Math.floor(Date.now() / 1000);
-  tray.setTitle(trayTitle(lastResult, BAR_WIDTH, nowSec));
+  tray.setTitle(trayTitle(lastResult, primary, BAR_WIDTH, nowSec));
   tray.setToolTip(trayTooltip(lastResult, nowSec));
+  if (popover && !popover.isDestroyed()) {
+    popover.webContents.send("quota:update", { result: lastResult, primary, nowSec });
+  }
 }
 
 async function poll(): Promise<void> {
@@ -42,15 +49,29 @@ function schedule(delaySeconds: number): void {
   pollTimer = setTimeout(() => { void poll(); }, delaySeconds * 1000);
 }
 
+const contextMenu = Menu.buildFromTemplate([
+  { label: "Refresh now", click: () => void poll() },
+  { type: "separator" },
+  { label: "Quit", role: "quit" },
+]);
+
 app.whenReady().then(() => {
   app.dock?.hide();
+  primary = loadPrimary();
+
+  popover = createPopover();
 
   tray = new Tray(nativeImage.createEmpty());
-  tray.setContextMenu(Menu.buildFromTemplate([
-    { label: "Refresh now", click: () => void poll() },
-    { type: "separator" },
-    { label: "Quit", role: "quit" },
-  ]));
+  tray.on("click", () => { if (popover && tray) { togglePopover(popover, tray.getBounds()); } });
+  tray.on("right-click", () => { tray?.popUpContextMenu(contextMenu); });
+
+  ipcMain.on("quota:setPrimary", (_e, p: Primary) => {
+    primary = p === "weekly" ? "weekly" : "session";
+    savePrimary(primary);
+    render();
+  });
+  ipcMain.on("quota:refresh", () => void poll());
+  ipcMain.on("quota:quit", () => app.quit());
 
   render();
   void poll();

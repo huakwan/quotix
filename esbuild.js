@@ -1,18 +1,37 @@
 const esbuild = require("esbuild");
+const { copyFileSync } = require("node:fs");
 const watch = process.argv.includes("--watch");
 
+const copyHtml = {
+  name: "copy-html",
+  setup(build) {
+    const { mkdirSync } = require("node:fs");
+    build.onEnd(() => {
+      mkdirSync("dist", { recursive: true });
+      copyFileSync("src/popover.html", "dist/popover.html");
+    });
+  },
+};
+
 async function main() {
-  const ctx = await esbuild.context({
-    entryPoints: ["src/main.ts"],
-    bundle: true,
-    format: "cjs",
-    platform: "node",
-    target: "node20",
-    outfile: "dist/main.js",
-    external: ["electron"],
-    sourcemap: true,
-    logLevel: "info",
-  });
-  if (watch) { await ctx.watch(); } else { await ctx.rebuild(); await ctx.dispose(); }
+  const node = {
+    bundle: true, format: "cjs", platform: "node", target: "node20",
+    external: ["electron"], sourcemap: true, logLevel: "info",
+  };
+  const contexts = await Promise.all([
+    esbuild.context({ ...node, entryPoints: ["src/main.ts"], outfile: "dist/main.js" }),
+    esbuild.context({ ...node, entryPoints: ["src/preload.ts"], outfile: "dist/preload.js" }),
+    esbuild.context({
+      entryPoints: ["src/popoverRenderer.ts"], outfile: "dist/popoverRenderer.js",
+      bundle: true, format: "iife", platform: "browser", target: "es2020",
+      sourcemap: true, logLevel: "info", plugins: [copyHtml],
+    }),
+  ]);
+  if (watch) {
+    await Promise.all(contexts.map((c) => c.watch()));
+  } else {
+    await Promise.all(contexts.map((c) => c.rebuild()));
+    await Promise.all(contexts.map((c) => c.dispose()));
+  }
 }
 main().catch((e) => { console.error(e); process.exit(1); });
