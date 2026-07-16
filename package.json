@@ -15,6 +15,7 @@
     "productName": "Quotix",
     "files": ["dist/**/*", "assets/**/*"],
     "mac": {
+      "icon": "assets/icon.icns",
       "target": "dir",
       "category": "public.app-category.utilities",
       "extendInfo": { "LSUIElement": true }

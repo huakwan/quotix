@@ -28,3 +28,8 @@ test("icns contains every standard macOS icon representation", () => {
     rmSync(output, { recursive: true, force: true });
   }
 });
+
+test("electron-builder uses the custom macOS icon", () => {
+  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+  assert.equal(pkg.build.mac.icon, "assets/icon.icns");
+});
