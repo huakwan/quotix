@@ -17,11 +17,10 @@ export function countdown(resetsAt: number, nowSec: number): string {
   return `${mins}m`;
 }
 
-function segment(label: string, w: QuotaWindow | null, width: number, nowSec: number): string {
+function segment(label: string, w: QuotaWindow | null, width: number, _nowSec: number): string {
   if (!w) { return `${label} --%`; }
   const pct = Math.round(w.usedPct);
-  const reset = w.resetsAt === null ? "--" : countdown(w.resetsAt, nowSec);
-  return `${label} ${bar(w.usedPct, width)} ${pct}% · ${reset}`;
+  return `${label} ${bar(w.usedPct, width)} ${pct}%`;
 }
 
 // Plain text for Tray.setTitle() — no codicons/theme colors, those are VSCode-only.
