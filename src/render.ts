@@ -1,4 +1,5 @@
 import { QuotaWindow, ReadResult } from "./model";
+import { Primary } from "./prefs";
 
 export function bar(pct: number, width: number): string {
   const clamped = Math.max(0, Math.min(100, pct));
@@ -24,8 +25,11 @@ function segment(label: string, w: QuotaWindow | null, width: number, nowSec: nu
 }
 
 // Plain text for Tray.setTitle() — no codicons/theme colors, those are VSCode-only.
-export function trayTitle(result: ReadResult, width: number, nowSec: number): string {
+export function trayTitle(result: ReadResult, primary: Primary, width: number, nowSec: number): string {
   if (!result.ok) { return "Quota: --"; }
+  if (primary === "weekly") {
+    return segment("W", result.quota.weekly, width, nowSec);
+  }
   return segment("S", result.quota.session, width, nowSec);
 }
 
