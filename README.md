@@ -27,21 +27,21 @@ displays your session and weekly quota utilization right in the menu bar.
 ## Getting started
 
 ```bash
-npm install
-npm start
+pnpm install
+pnpm start
 ```
 
-`npm start` compiles the TypeScript sources with esbuild and launches the
+`pnpm start` compiles the TypeScript sources with esbuild and launches the
 Electron app.
 
 ## Scripts
 
 | Script          | Description                                      |
 | --------------- | ------------------------------------------------- |
-| `npm run compile` | Bundle `src/main.ts` to `dist/main.js` via esbuild |
-| `npm run watch`   | Same as `compile`, but watches for changes         |
-| `npm start`       | Compile, then launch the Electron app              |
-| `npm run dist:mac` | Compile, then package a `.app` with electron-builder (unpacked dir target) |
+| `pnpm run compile` | Bundle `src/main.ts` to `dist/main.js` via esbuild |
+| `pnpm run watch`   | Same as `compile`, but watches for changes         |
+| `pnpm start`       | Compile, then launch the Electron app              |
+| `pnpm run dist:mac` | Compile, then package a `.app` with electron-builder (unpacked dir target) |
 
 ## How it works
 
@@ -62,5 +62,5 @@ Electron app.
 
 - Quotix only reads your local Keychain entry; it does not store or
   transmit credentials anywhere beyond the standard Anthropic API request.
-- Packaging (`npm run dist:mac`) currently targets an unpacked `.app`
+- Packaging (`pnpm run dist:mac`) currently targets an unpacked `.app`
   directory, not a signed/notarized installer.

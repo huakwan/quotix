@@ -5,11 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm install          # install deps
-npm run compile      # bundle src/main.ts -> dist/main.js via esbuild
-npm run watch        # same, watch mode
-npm start            # compile, then launch the Electron app
-npm run dist:mac      # compile, then package unpacked .app via electron-builder
+pnpm install          # install deps
+pnpm run compile      # bundle src/main.ts -> dist/main.js via esbuild
+pnpm run watch        # same, watch mode
+pnpm start            # compile, then launch the Electron app
+pnpm run dist:mac      # compile, then package unpacked .app via electron-builder
 ```
 
 There is no test suite, lint config, or typecheck script in this repo — `tsconfig.json` exists only for editor/type-checking support, not a build step (esbuild does the actual bundling and does not type-check).
