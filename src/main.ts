@@ -74,7 +74,7 @@ async function poll(): Promise<void> {
   lastResult = result;
   if (result.ok) { lastGood = result; saveQuotaCache(result.quota); }
 
-  if (result.error === "HTTP 429") {
+  if (!result.ok && result.error === "HTTP 429") {
     consecutive429s += 1;
     const backoff = (result.retryAfterSeconds ?? REFRESH_INTERVAL_SECONDS) * 2 ** (consecutive429s - 1);
     render();
