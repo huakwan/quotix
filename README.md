@@ -2,6 +2,8 @@
 
 Show Claude Code and Codex usage quota in the macOS menu bar.
 
+![Quotix](https://raw.githubusercontent.com/huakwan/quotix/main/assets/poster.png)
+
 Quotix is a small Electron menu bar app that polls the local signed-in sessions
 used by Claude Code and Codex. The menu bar shows one source; clicking it opens
 a popover with Claude, Codex, or both.
