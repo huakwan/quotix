@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { Quota, QuotaWindow } from "./model";
 
 // Persists the last successfully-fetched quota so the tray can show real numbers
-// immediately on launch (dimmed as stale) instead of "N/A" while the first poll
-// runs — and to survive frequent 429 rate-limit stretches across restarts.
+// immediately on launch instead of a loading state while the first poll runs —
+// and to survive frequent 429 rate-limit stretches across restarts.
 
 function cachePath(): string {
   return join(app.getPath("userData"), "quotix-quota-cache.json");

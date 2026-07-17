@@ -1,4 +1,4 @@
-import type { QuotaWindow } from "../quota/model";
+import type { QuotaWindow, ReadResult } from "../quota/model";
 import type { UpdatePayload } from "./preload";
 
 declare global {
@@ -30,9 +30,32 @@ function countdown(resetsAt: number | null, nowSec: number): string {
   return `${m}m`;
 }
 
+function updatedAgo(updatedAt: number, nowSec: number): string {
+  const s = Math.max(0, nowSec - updatedAt);
+  if (s < 60) { return "Updated just now"; }
+  const m = Math.floor(s / 60);
+  if (m < 60) { return `Updated ${m} min ago`; }
+  const h = Math.floor(m / 60);
+  if (h < 24) { return `Updated ${h}h ago`; }
+  const d = Math.floor(h / 24);
+  return `Updated ${d}d ago`;
+}
+
+function unavailableMessage(result: Extract<ReadResult, { ok: false }>): string {
+  if (result.reason === "missing") {
+    return "No Claude Code credentials found. Sign in with the Claude Code CLI to see quota here.";
+  }
+  if (result.error === "HTTP 401") { return "Sign-in expired. Retrying automatically…"; }
+  if (result.error === "HTTP 429") { return "Rate limited by Anthropic. Retrying shortly…"; }
+  if (result.error === "Request timed out") { return "Request timed out. Retrying shortly…"; }
+  if (result.error?.startsWith("Network error")) { return "Network error. Check your connection."; }
+  if (result.error?.startsWith("HTTP ")) { return `Anthropic API error (${result.error}).`; }
+  return "Quota data unavailable.";
+}
+
 function rowHtml(label: string, w: QuotaWindow | null, nowSec: number): string {
   if (!w) {
-    return `<div class="row"><span class="label">${label}</span><span class="dot"></span>` +
+    return `<div class="row"><span class="label">${label}</span>` +
       `<div class="track"></div><span class="pct">--%</span><span class="reset">--</span></div>`;
   }
   const pct = Math.round(w.usedPct);
@@ -40,7 +63,6 @@ function rowHtml(label: string, w: QuotaWindow | null, nowSec: number): string {
   const width = Math.max(0, Math.min(100, w.usedPct));
   return `<div class="row">` +
     `<span class="label">${label}</span>` +
-    `<span class="dot ${cls}"></span>` +
     `<div class="track"><div class="fill ${cls}" style="width:${width}%"></div></div>` +
     `<span class="pct">${pct}%</span>` +
     `<span class="reset">${countdown(w.resetsAt, nowSec)}</span>` +
@@ -50,13 +72,16 @@ function rowHtml(label: string, w: QuotaWindow | null, nowSec: number): string {
 function draw(): void {
   if (!last) { return; }
   const rows = document.getElementById("rows")!;
+  const updated = document.getElementById("updated")!;
   const nowSec = last.nowSec;
   if (!last.result.ok) {
-    rows.innerHTML = `<div class="unavailable">Quota unavailable (${last.result.reason})</div>`;
+    rows.innerHTML = `<div class="unavailable">${unavailableMessage(last.result)}</div>`;
+    updated.textContent = "";
   } else {
     rows.innerHTML =
-      rowHtml("5h", last.result.quota.session, nowSec) +
-      rowHtml("Wk", last.result.quota.weekly, nowSec);
+      rowHtml("5H", last.result.quota.session, nowSec) +
+      rowHtml("7D", last.result.quota.weekly, nowSec);
+    updated.textContent = updatedAgo(last.result.quota.updatedAt, nowSec);
   }
 }
 

@@ -1,7 +1,6 @@
 import { app, Tray, Menu, nativeImage, nativeTheme, ipcMain, BrowserWindow } from "electron";
 import { createCachedTokenProvider } from "./quota/oauthCredentials";
 import { fetchOAuthQuota, MAX_RATE_LIMIT_BACKOFF_SECONDS } from "./quota/oauthSource";
-import { trayTooltip } from "./ui/render";
 import { renderTray } from "./ui/trayCapture";
 import { ReadResult } from "./quota/model";
 import { loadQuotaCache, saveQuotaCache } from "./quota/cache";
@@ -15,45 +14,39 @@ let tray: Tray | undefined;
 let popover: BrowserWindow | undefined;
 let lastResult: ReadResult = { ok: false, reason: "missing" };
 let lastGood: OkResult | null = null;   // survives 429/network errors so the tray keeps showing numbers
-let lastError: string | undefined;      // set while the latest fetch is failing
 let pollTimer: NodeJS.Timeout | undefined;
 let consecutive429s = 0;                // drives exponential backoff so repeated 429s don't retry at the same cadence
-
-function describeError(e: string | undefined): string {
-  if (e === "HTTP 429") { return "rate limited"; }
-  if (e === "HTTP 401") { return "auth expired"; }
-  return e ?? "unavailable";
-}
+let tokenChecked = false;               // true once the token has actually been looked up (disambiguates "no token" from "not polled yet")
+let loading = false;                    // true only while a fetch is in flight and we have no cached data at all to show meanwhile
 
 const tokenProvider = createCachedTokenProvider();
 
 function render(): void {
   if (!tray) { return; }
   const nowSec = Math.floor(Date.now() / 1000);
-  const stale = !lastResult.ok;
-  // Always draw the full inline row (5H [bar] % | 7D [bar] %) with the system font.
-  // With last-good data: real numbers, dimmed while a fetch is failing.
-  // With no data yet: empty tracks + "N/A", dimmed.
+  const tokenMissing = tokenChecked && !lastResult.ok && lastResult.reason === "missing";
+  // Three tray states: no token -> icon + "Unavailable"; no cached data yet while a fetch
+  // is in flight -> icon + "Loading..."; otherwise the normal dual bar with last-good/cached
+  // numbers (no dimming — cached numbers render at full opacity).
   const session = lastGood?.quota.session?.usedPct ?? null;
   const weekly = lastGood?.quota.weekly?.usedPct ?? null;
   tray.setTitle("");
-  void updateTrayImage(session, weekly, stale);
-  tray.setToolTip(tooltip(nowSec));
+  void updateTrayImage(session, weekly, { loading, tokenMissing });
   if (popover && !popover.isDestroyed()) {
-    // Feed the popover the last-good data too, so it shows numbers rather than "unavailable".
-    popover.webContents.send("quota:update", { result: lastGood ?? lastResult, nowSec, stale });
+    // No token -> always show the explanatory text, never fall back to stale cached bars.
+    // Every other failure (401/429/network/other HTTP) -> keep showing cached numbers.
+    const popoverResult = tokenMissing ? lastResult : (lastGood ?? lastResult);
+    popover.webContents.send("quota:update", { result: popoverResult, nowSec });
   }
 }
 
-function tooltip(nowSec: number): string {
-  const base = lastGood ? trayTooltip(lastGood, nowSec) : trayTooltip(lastResult, nowSec);
-  if (lastGood && !lastResult.ok) { return `${base}\n⚠ ${describeError(lastError)} — showing last data`; }
-  return base;
-}
-
-async function updateTrayImage(session: number | null, weekly: number | null, stale: boolean): Promise<void> {
+async function updateTrayImage(
+  session: number | null,
+  weekly: number | null,
+  mode: { loading: boolean; tokenMissing: boolean },
+): Promise<void> {
   try {
-    const img = await renderTray(session, weekly, nativeTheme.shouldUseDarkColors, stale);
+    const img = await renderTray(session, weekly, nativeTheme.shouldUseDarkColors, mode);
     tray?.setImage(img);
   } catch {
     /* keep last image on capture failure */
@@ -62,19 +55,24 @@ async function updateTrayImage(session: number | null, weekly: number | null, st
 
 async function poll(): Promise<void> {
   const token = tokenProvider.get();
+  tokenChecked = true;
   if (!token.ok) {
     lastResult = { ok: false, reason: "missing" };
-    lastError = "no token";
     render();
     schedule(REFRESH_INTERVAL_SECONDS);
     return;
   }
 
+  if (!lastGood) {
+    loading = true;
+    render();
+  }
+
   const result = await fetchOAuthQuota(token.token, fetch);
+  loading = false;
   if (result.tokenInvalid) { tokenProvider.invalidate(); }
   lastResult = result;
-  if (result.ok) { lastGood = result; lastError = undefined; saveQuotaCache(result.quota); }
-  else { lastError = result.error ?? result.reason; }
+  if (result.ok) { lastGood = result; saveQuotaCache(result.quota); }
 
   if (result.error === "HTTP 429") {
     consecutive429s += 1;
@@ -102,7 +100,7 @@ const contextMenu = Menu.buildFromTemplate([
 app.whenReady().then(() => {
   app.dock?.hide();
 
-  // Seed from the on-disk cache so the tray shows real (stale) numbers before the first poll.
+  // Seed from the on-disk cache so the tray shows real numbers before the first poll completes.
   const cached = loadQuotaCache();
   if (cached) { lastGood = { ok: true, quota: cached }; }
 

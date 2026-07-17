@@ -28,27 +28,36 @@ const PAGE = `
   }
   .fill { height: 100%; border-radius: 3px; width: 0%; }
   .green { background: #35c759; } .amber { background: #ffcc00; } .red { background: #ff453a; }
+  #unavailable, #loading { display: none; }
 </style></head><body>
 <div id="row">
   <img class="logo" src="data:image/svg+xml;base64,${anthropicIcon}" alt="" />
-  <span class="grp"><span class="label">5H</span><span class="track"><span id="fs" class="fill"></span></span><span id="ps" class="pct"></span></span>
-  <span class="grp"><span class="label">7D</span><span class="track"><span id="fw" class="fill"></span></span><span id="pw" class="pct"></span></span>
+  <span id="grp5" class="grp"><span class="label">5H</span><span class="track"><span id="fs" class="fill"></span></span><span id="ps" class="pct"></span></span>
+  <span id="grp7" class="grp"><span class="label">7D</span><span class="track"><span id="fw" class="fill"></span></span><span id="pw" class="pct"></span></span>
+  <span id="unavailable">Unavailable</span>
+  <span id="loading">Loading...</span>
 </div>
 <script>
   function cls(p){ return p > 90 ? 'red' : p >= 70 ? 'amber' : 'green'; }
   function seg(fillId, pctId, v){
     var f = document.getElementById(fillId), p = document.getElementById(pctId);
-    if (v === null){ f.style.width = '0%'; f.className = 'fill'; p.textContent = 'N/A'; }
-    else {
-      var c = Math.max(0, Math.min(100, v));
-      f.style.width = c + '%'; f.className = 'fill ' + cls(c); p.textContent = Math.round(c) + '%';
-    }
+    var c = Math.max(0, Math.min(100, v === null ? 0 : v));
+    f.style.width = c + '%'; f.className = 'fill ' + cls(c); p.textContent = Math.round(c) + '%'; p.className = 'pct';
   }
-  window.__render = function(s, w, dark, stale){
+  window.__render = function(s, w, dark, loading, unavailable){
     document.documentElement.style.color = dark ? '#f2f2f2' : '#1c1c1e';
     var row = document.getElementById('row');
-    row.style.opacity = stale ? '0.65' : '1';
-    seg('fs', 'ps', s); seg('fw', 'pw', w);
+    var grp5 = document.getElementById('grp5'), grp7 = document.getElementById('grp7');
+    var una = document.getElementById('unavailable'), ld = document.getElementById('loading');
+    grp5.style.display = 'none'; grp7.style.display = 'none'; una.style.display = 'none'; ld.style.display = 'none';
+    if (unavailable) {
+      una.style.display = 'inline-flex';
+    } else if (loading) {
+      ld.style.display = 'inline-flex';
+    } else {
+      grp5.style.display = 'inline-flex'; grp7.style.display = 'inline-flex';
+      seg('fs', 'ps', s); seg('fw', 'pw', w);
+    }
     return Math.ceil(row.getBoundingClientRect().width);
   };
 </script>
@@ -73,15 +82,23 @@ function ensure(): Promise<void> {
 
 const j = (v: number | null): string => (v === null ? "null" : String(v));
 
+export interface TrayMode {
+  loading: boolean;
+  tokenMissing: boolean;
+}
+
 export async function renderTray(
   session: number | null,
   weekly: number | null,
   dark: boolean,
-  stale = false,
+  mode: TrayMode = { loading: false, tokenMissing: false },
 ): Promise<NativeImage> {
   await ensure();
   const wc = win!.webContents;
-  const width: number = await wc.executeJavaScript(`window.__render(${j(session)}, ${j(weekly)}, ${dark}, ${stale})`);
+  const { loading, tokenMissing } = mode;
+  const width: number = await wc.executeJavaScript(
+    `window.__render(${j(session)}, ${j(weekly)}, ${dark}, ${loading}, ${tokenMissing})`,
+  );
   const w = Math.max(1, Math.min(320, width));
   win!.setContentSize(w, H);
   // Let the resize + fill-width transition settle before grabbing the pixels.

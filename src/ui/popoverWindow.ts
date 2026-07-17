@@ -2,7 +2,7 @@ import { BrowserWindow, screen } from "electron";
 import { join } from "node:path";
 
 const WIDTH = 272;
-const HEIGHT = 150;
+const HEIGHT = 172;
 
 let lastHiddenAt = 0;
 
