@@ -1,7 +1,7 @@
 import anthropicIcon from "../../assets/anthropic.svg";
 import openaiIcon from "../../assets/openai.svg";
 import { BrowserWindow, NativeImage, nativeImage, screen } from "electron";
-import { trayWindowVisibility, type TrayDisplayState } from "./trayState";
+import { trayWindowPresentation, type TrayDisplayState } from "./trayState";
 
 // Renders the tray's available inline quota rows with the real system font by
 // laying them out in a hidden BrowserWindow and capturing them to a NativeImage.
@@ -28,6 +28,8 @@ const PAGE = `
     display: inline-flex; width: 60px; height: 6px; border-radius: 3px;
     background: rgba(140, 140, 145, 0.35); overflow: hidden;
   }
+  .grp.compact-weekly .label { display: none; }
+  .grp.compact-weekly .track { width: 90px; }
   .fill { height: 100%; border-radius: 3px; width: 0%; }
   .green { background: #35c759; } .amber { background: #ffcc00; } .red { background: #ff453a; }
   #unavailable, #loading { display: none; }
@@ -47,7 +49,7 @@ const PAGE = `
     f.style.width = c + '%'; f.className = 'fill ' + cls(c); p.textContent = Math.round(c) + '%'; p.className = 'pct';
   }
   var logos = { claude: 'data:image/svg+xml;base64,${anthropicIcon}', codex: 'data:image/svg+xml;base64,${openaiIcon}' };
-  window.__render = function(provider, s, w, showSession, showWeekly, dark, loading, unavailable){
+  window.__render = function(provider, s, w, showSession, showWeekly, compactWeekly, dark, loading, unavailable){
     document.documentElement.style.color = dark ? '#f2f2f2' : '#1c1c1e';
     var logo = document.getElementById('logo');
     logo.src = logos[provider];
@@ -55,6 +57,7 @@ const PAGE = `
     var row = document.getElementById('row');
     var grp5 = document.getElementById('grp5'), grp7 = document.getElementById('grp7');
     var una = document.getElementById('unavailable'), ld = document.getElementById('loading');
+    grp7.classList.toggle('compact-weekly', compactWeekly);
     grp5.style.display = 'none'; grp7.style.display = 'none'; una.style.display = 'none'; ld.style.display = 'none';
     if (unavailable) {
       una.style.display = 'inline-flex';
@@ -94,9 +97,9 @@ export async function renderTray(
 ): Promise<NativeImage> {
   await ensure();
   const wc = win!.webContents;
-  const visibility = trayWindowVisibility(display);
+  const presentation = trayWindowPresentation(display);
   const width: number = await wc.executeJavaScript(
-    `window.__render(${JSON.stringify(display.provider)}, ${j(display.session)}, ${j(display.weekly)}, ${visibility.session}, ${visibility.weekly}, ${dark}, ${display.loading}, ${display.unavailable})`,
+    `window.__render(${JSON.stringify(display.provider)}, ${j(display.session)}, ${j(display.weekly)}, ${presentation.session}, ${presentation.weekly}, ${presentation.compactWeekly}, ${dark}, ${display.loading}, ${display.unavailable})`,
   );
   const w = Math.max(1, Math.min(320, width));
   win!.setContentSize(w, H);

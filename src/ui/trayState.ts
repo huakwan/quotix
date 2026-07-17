@@ -18,6 +18,20 @@ export function trayWindowVisibility(display: TrayDisplayState): {
   return { session: display.session !== null, weekly: display.weekly !== null };
 }
 
+export interface TrayWindowPresentation {
+  session: boolean;
+  weekly: boolean;
+  compactWeekly: boolean;
+}
+
+export function trayWindowPresentation(display: TrayDisplayState): TrayWindowPresentation {
+  const visibility = trayWindowVisibility(display);
+  return {
+    ...visibility,
+    compactWeekly: !visibility.session && visibility.weekly,
+  };
+}
+
 export function trayDisplayState(provider: ProviderId, state: SourceState): TrayDisplayState {
   const quota = state.lastGood ?? (state.result.ok ? state.result.quota : null);
   return {
