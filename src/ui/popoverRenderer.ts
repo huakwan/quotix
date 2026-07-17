@@ -152,7 +152,7 @@ onSegment("reset-mode", (value) => window.quotix.setResetMode(value as ResetMode
 onSegment("pace-mode", (value) => window.quotix.setShowPaceLine(value === "on"));
 document.getElementById("refresh")!.addEventListener("click", () => window.quotix.refresh());
 document.getElementById("quit")!.addEventListener("click", () => window.quotix.quit());
-document.getElementById("version")!.textContent = `v${__APP_VERSION__}`;
+document.getElementById("version")!.textContent = `hu@KwaN - v${__APP_VERSION__}`;
 
 const panel = document.querySelector(".panel")!;
 let lastHeight = 0;

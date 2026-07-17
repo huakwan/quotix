@@ -1,6 +1,6 @@
 {
   "name": "quotix",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Show Claude Code and Codex usage quota in the macOS menu bar.",
   "private": true,
   "main": "dist/main.js",
@@ -16,12 +16,17 @@
   "build": {
     "appId": "com.huakwan.quotix",
     "productName": "Quotix",
-    "files": ["dist/**/*", "assets/**/*"],
+    "files": [
+      "dist/**/*",
+      "assets/**/*"
+    ],
     "mac": {
       "icon": "assets/icon.icns",
       "target": "dir",
       "category": "public.app-category.utilities",
-      "extendInfo": { "LSUIElement": true }
+      "extendInfo": {
+        "LSUIElement": true
+      }
     }
   },
   "devDependencies": {
