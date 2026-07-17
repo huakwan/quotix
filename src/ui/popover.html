@@ -16,12 +16,18 @@
         --red: #ff453a;
         --chip: rgba(255, 255, 255, 0.22);
       }
+      .codex-logo {
+        filter: invert(1);
+      }
       @media (prefers-color-scheme: light) {
         :root {
           --fg: #1c1c1e;
           --muted: #6b6b70;
           --track: rgba(0, 0, 0, 0.1);
           --chip: #ffffff;
+        }
+        .codex-logo {
+          filter: none;
         }
       }
       * {

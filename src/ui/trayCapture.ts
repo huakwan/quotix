@@ -49,7 +49,9 @@ const PAGE = `
   var logos = { claude: 'data:image/svg+xml;base64,${anthropicIcon}', codex: 'data:image/svg+xml;base64,${openaiIcon}' };
   window.__render = function(provider, s, w, dark, loading, unavailable){
     document.documentElement.style.color = dark ? '#f2f2f2' : '#1c1c1e';
-    document.getElementById('logo').src = logos[provider];
+    var logo = document.getElementById('logo');
+    logo.src = logos[provider];
+    logo.style.filter = provider === 'codex' && dark ? 'invert(1)' : 'none';
     var row = document.getElementById('row');
     var grp5 = document.getElementById('grp5'), grp7 = document.getElementById('grp7');
     var una = document.getElementById('unavailable'), ld = document.getElementById('loading');
