@@ -1,0 +1,81 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { SourceRuntime } from "../out/src/quota/sourceRuntime.js";
+
+const quota = { updatedAt: 100, session: { usedPct: 10, resetsAt: 500 }, weekly: null, planDetected: true };
+
+function harness(results, cached = null) {
+  let nowMs = 0;
+  let saved = null;
+  const provider = {
+    id: "claude",
+    calls: 0,
+    disposed: false,
+    read: async () => { provider.calls += 1; return results.shift(); },
+    dispose: () => { provider.disposed = true; },
+  };
+  const cache = { path: "/cache", load: () => cached, save: (value) => { saved = value; } };
+  const runtime = new SourceRuntime(provider, cache, { nowMs: () => nowMs });
+  return { provider, runtime, setNow: (value) => { nowMs = value; }, saved: () => saved };
+}
+
+test("runtime seeds its state from last-good cache", () => {
+  const { runtime } = harness([], quota);
+  assert.equal(runtime.state().loading, false);
+  assert.deepEqual(runtime.state().lastGood, quota);
+  assert.deepEqual(runtime.state().result, { ok: true, quota });
+});
+
+test("runtime saves success and exposes it", async () => {
+  const fresh = { ...quota, updatedAt: 200 };
+  const h = harness([{ ok: true, quota: fresh }]);
+  await h.runtime.poll();
+  assert.deepEqual(h.runtime.state().lastGood, fresh);
+  assert.deepEqual(h.saved(), fresh);
+});
+
+test("transient failure retains last-good data with diagnostic", async () => {
+  const h = harness([{ ok: false, kind: "transient", error: "offline" }], quota);
+  await h.runtime.poll();
+  assert.deepEqual(h.runtime.state().result, { ok: true, quota, diagnostic: "offline" });
+});
+
+test("missing provider without cache becomes unavailable", async () => {
+  const h = harness([{ ok: false, kind: "missing", error: "not found" }]);
+  await h.runtime.poll();
+  assert.deepEqual(h.runtime.state().result, { ok: false, reason: "missing", error: "not found" });
+});
+
+test("in-flight polls are deduplicated", async () => {
+  let resolve;
+  const pending = new Promise((done) => { resolve = done; });
+  const h = harness([]);
+  h.provider.read = async () => { h.provider.calls += 1; return pending; };
+  const first = h.runtime.poll();
+  const second = h.runtime.poll();
+  assert.equal(h.provider.calls, 1);
+  resolve({ ok: true, quota });
+  await Promise.all([first, second]);
+});
+
+test("rate-limit backoff blocks force refresh and grows exponentially", async () => {
+  const h = harness([
+    { ok: false, kind: "rate-limited", error: "429", retryAfterSeconds: 60 },
+    { ok: false, kind: "rate-limited", error: "429", retryAfterSeconds: 60 },
+    { ok: true, quota },
+  ]);
+  await h.runtime.poll();
+  h.setNow(30_000);
+  await h.runtime.poll(true);
+  assert.equal(h.provider.calls, 1);
+  h.setNow(60_000);
+  await h.runtime.poll();
+  assert.equal(h.provider.calls, 2);
+  h.setNow(179_000);
+  await h.runtime.poll();
+  assert.equal(h.provider.calls, 2);
+  h.setNow(180_000);
+  await h.runtime.poll();
+  assert.equal(h.provider.calls, 3);
+});
