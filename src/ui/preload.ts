@@ -12,4 +12,5 @@ contextBridge.exposeInMainWorld("quotix", {
   },
   refresh: (): void => { ipcRenderer.send("quota:refresh"); },
   quit: (): void => { ipcRenderer.send("quota:quit"); },
+  resize: (height: number): void => { ipcRenderer.send("popover:resize", height); },
 });

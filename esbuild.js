@@ -1,5 +1,6 @@
 const esbuild = require("esbuild");
 const { copyFileSync } = require("node:fs");
+const pkg = require("./package.json");
 const watch = process.argv.includes("--watch");
 
 const copyHtml = {
@@ -25,6 +26,7 @@ async function main() {
     esbuild.context({
       entryPoints: ["src/ui/popoverRenderer.ts"], outfile: "dist/popoverRenderer.js",
       bundle: true, format: "iife", platform: "browser", target: "es2020",
+      define: { __APP_VERSION__: JSON.stringify(pkg.version) },
       sourcemap: true, logLevel: "info", plugins: [copyHtml],
     }),
   ]);

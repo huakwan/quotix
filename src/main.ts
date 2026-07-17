@@ -4,7 +4,7 @@ import { fetchOAuthQuota, MAX_RATE_LIMIT_BACKOFF_SECONDS } from "./quota/oauthSo
 import { renderTray } from "./ui/trayCapture";
 import { ReadResult } from "./quota/model";
 import { loadQuotaCache, saveQuotaCache } from "./quota/cache";
-import { createPopover, togglePopover } from "./ui/popoverWindow";
+import { createPopover, togglePopover, resizePopover } from "./ui/popoverWindow";
 
 const REFRESH_INTERVAL_SECONDS = 2 * 60;
 
@@ -107,11 +107,22 @@ app.whenReady().then(() => {
   popover = createPopover();
 
   tray = new Tray(nativeImage.createEmpty());
-  tray.on("click", () => { if (popover && tray) { togglePopover(popover, tray.getBounds()); } });
+  tray.on("click", () => {
+    if (popover && tray) {
+      // Re-render from cache when the popover opens so "Updated x min ago" and the
+      // countdowns reflect a fresh nowSec. The renderer's local 1s tick gets throttled
+      // while the window is hidden, so its clock drifts behind real time; pushing a
+      // current nowSec here corrects it without a network fetch.
+      if (togglePopover(popover, tray.getBounds())) { render(); }
+    }
+  });
   tray.on("right-click", () => { tray?.popUpContextMenu(contextMenu); });
 
   ipcMain.on("quota:refresh", () => void poll());
   ipcMain.on("quota:quit", () => app.quit());
+  ipcMain.on("popover:resize", (_e, height: number) => {
+    if (popover) { resizePopover(popover, height); }
+  });
 
   render();
   void poll();
