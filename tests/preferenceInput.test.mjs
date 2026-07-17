@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { asDisplaySource, asMenuBarSource, asResetMode } from "../out/src/preferenceInput.js";
+import { asDisplaySource, asMenuBarSource, asResetMode, asShowPaceLine } from "../out/src/preferenceInput.js";
 
 test("display source accepts only Claude, Codex, or Both", () => {
   assert.equal(asDisplaySource("claude"), "claude");
@@ -21,4 +21,11 @@ test("reset mode accepts only countdown or clock", () => {
   assert.equal(asResetMode("countdown"), "countdown");
   assert.equal(asResetMode("clock"), "clock");
   assert.equal(asResetMode("date"), null);
+});
+
+test("pace line accepts only booleans", () => {
+  assert.equal(asShowPaceLine(true), true);
+  assert.equal(asShowPaceLine(false), false);
+  assert.equal(asShowPaceLine("on"), null);
+  assert.equal(asShowPaceLine(1), null);
 });

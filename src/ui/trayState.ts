@@ -4,6 +4,8 @@ export interface TrayDisplayState {
   provider: ProviderId;
   session: number | null;
   weekly: number | null;
+  sessionResetsAt: number | null;
+  weeklyResetsAt: number | null;
   loading: boolean;
   unavailable: boolean;
 }
@@ -38,6 +40,8 @@ export function trayDisplayState(provider: ProviderId, state: SourceState): Tray
     provider,
     session: quota?.session?.usedPct ?? null,
     weekly: quota?.weekly?.usedPct ?? null,
+    sessionResetsAt: quota?.session?.resetsAt ?? null,
+    weeklyResetsAt: quota?.weekly?.resetsAt ?? null,
     loading: state.loading && quota === null,
     unavailable: !state.loading && quota === null && !state.result.ok,
   };

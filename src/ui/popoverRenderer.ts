@@ -9,6 +9,7 @@ declare global {
       setSource(source: DisplaySource): void;
       setMenuBarSource(source: ProviderId): void;
       setResetMode(mode: ResetMode): void;
+      setShowPaceLine(value: boolean): void;
       refresh(): void;
       quit(): void;
       resize(height: number): void;
@@ -76,7 +77,23 @@ function unavailableMessage(provider: ProviderId, state: SourceState): string {
   return "Quota data unavailable. Retrying automatically…";
 }
 
-function rowHtml(label: string, window: QuotaWindow | null, nowSec: number, mode: ResetMode): string {
+const WINDOW_SECONDS: Record<string, number> = {
+  "5H": 5 * 3600,
+  "7D": 7 * 24 * 3600,
+};
+
+// Marker showing where usage "should" be at the current point in the window,
+// i.e. the fraction of the window that has elapsed (paced usage line).
+function guideHtml(label: string, resetsAt: number | null, nowSec: number, show: boolean): string {
+  if (!show) { return ""; }
+  const duration = WINDOW_SECONDS[label];
+  if (!duration || resetsAt === null) { return ""; }
+  const remaining = resetsAt - nowSec;
+  const elapsedPct = Math.max(0, Math.min(100, ((duration - remaining) / duration) * 100));
+  return `<div class="guide" style="left:${elapsedPct}%"></div>`;
+}
+
+function rowHtml(label: string, window: QuotaWindow | null, nowSec: number, mode: ResetMode, showPaceLine: boolean): string {
   if (!window) {
     return `<div class="item"><div class="row"><span class="label">${label}</span>`
       + `<div class="track"></div><span class="pct">0%</span></div><div class="reset">(not started)</div></div>`;
@@ -84,7 +101,8 @@ function rowHtml(label: string, window: QuotaWindow | null, nowSec: number, mode
   const pct = Math.round(window.usedPct);
   const width = Math.max(0, Math.min(100, window.usedPct));
   return `<div class="item"><div class="row"><span class="label">${label}</span>`
-    + `<div class="track"><div class="fill ${colorClass(pct)}" style="width:${width}%"></div></div>`
+    + `<div class="track"><div class="fill ${colorClass(pct)}" style="width:${width}%"></div>`
+    + `${guideHtml(label, window.resetsAt, nowSec, showPaceLine)}</div>`
     + `<span class="pct">${pct}%</span></div>`
     + `<div class="reset">${resetText(window.resetsAt, nowSec, mode)}</div></div>`;
 }
@@ -94,7 +112,7 @@ function sectionHtml(provider: ProviderId, name: string, state: SourceState, pay
   const quota = state.lastGood ?? (state.result.ok ? state.result.quota : null);
   const body = quota
     ? quotaRowsForProvider(provider, quota)
-      .map((row) => rowHtml(row.label, row.window, payload.nowSec, payload.preferences.resetMode))
+      .map((row) => rowHtml(row.label, row.window, payload.nowSec, payload.preferences.resetMode, payload.preferences.showPaceLine))
       .join("")
       + `<div class="updated">${updatedAgo(quota.updatedAt, payload.nowSec)}</div>`
     : `<div class="unavailable">${unavailableMessage(provider, state)}</div>`;
@@ -116,6 +134,7 @@ function draw(): void {
   syncButtons("source-mode", last.preferences.source);
   syncButtons("menu-source", last.preferences.menuBarSource);
   syncButtons("reset-mode", last.preferences.resetMode);
+  syncButtons("pace-mode", last.preferences.showPaceLine ? "on" : "off");
   document.getElementById("menu-source-row")!.classList.toggle("hidden", !showMenuBarSetting(last.preferences));
 }
 
@@ -130,6 +149,7 @@ window.quotix.onUpdate((payload) => { last = payload; draw(); });
 onSegment("source-mode", (value) => window.quotix.setSource(value as DisplaySource));
 onSegment("menu-source", (value) => window.quotix.setMenuBarSource(value as ProviderId));
 onSegment("reset-mode", (value) => window.quotix.setResetMode(value as ResetMode));
+onSegment("pace-mode", (value) => window.quotix.setShowPaceLine(value === "on"));
 document.getElementById("refresh")!.addEventListener("click", () => window.quotix.refresh());
 document.getElementById("quit")!.addEventListener("click", () => window.quotix.quit());
 document.getElementById("version")!.textContent = `v${__APP_VERSION__}`;

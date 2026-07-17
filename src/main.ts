@@ -8,7 +8,7 @@ import { CodexQuotaProvider } from "./quota/codex/provider";
 import { QuotaCoordinator } from "./quota/coordinator";
 import type { ProviderId, QuotaSnapshot } from "./quota/model";
 import { SourceRuntime } from "./quota/sourceRuntime";
-import { asDisplaySource, asMenuBarSource, asResetMode } from "./preferenceInput";
+import { asDisplaySource, asMenuBarSource, asResetMode, asShowPaceLine } from "./preferenceInput";
 import {
   effectiveMenuBarSource,
   loadPreferences,
@@ -48,7 +48,7 @@ function render(): void {
 
 async function updateTray(provider: ProviderId, snapshot: QuotaSnapshot): Promise<void> {
   try {
-    const image = await renderTray(trayDisplayState(provider, snapshot[provider]));
+    const image = await renderTray(trayDisplayState(provider, snapshot[provider]), preferences.showPaceLine);
     tray?.setImage(image);
   } catch {
     /* retain the last tray image if capture fails */
@@ -89,6 +89,12 @@ function registerIpc(): void {
     const resetMode = asResetMode(value);
     if (!resetMode) { return; }
     preferences = { ...preferences, resetMode };
+    persistPreferences();
+  });
+  ipcMain.on("preferences:setShowPaceLine", (_event, value: unknown) => {
+    const showPaceLine = asShowPaceLine(value);
+    if (showPaceLine === null) { return; }
+    preferences = { ...preferences, showPaceLine };
     persistPreferences();
   });
 }

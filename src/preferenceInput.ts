@@ -12,3 +12,7 @@ export function asMenuBarSource(value: unknown): ProviderId | null {
 export function asResetMode(value: unknown): ResetMode | null {
   return value === "countdown" || value === "clock" ? value : null;
 }
+
+export function asShowPaceLine(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}

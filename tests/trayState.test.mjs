@@ -14,7 +14,9 @@ test("tray selector carries provider identity and good percentages", () => {
   assert.deepEqual(trayDisplayState("codex", {
     enabled: true, loading: false, result: { ok: true, quota }, lastGood: quota,
   }), {
-    provider: "codex", session: 12, weekly: 34, loading: false, unavailable: false,
+    provider: "codex", session: 12, weekly: 34,
+    sessionResetsAt: 200, weeklyResetsAt: 400,
+    loading: false, unavailable: false,
   });
 });
 

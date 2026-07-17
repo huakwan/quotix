@@ -25,18 +25,25 @@ const PAGE = `
   .label { opacity: 0.65; }
   .pct { font-variant-numeric: tabular-nums; }
   .track {
+    position: relative;
     display: inline-flex; width: 80px; height: 6px; border-radius: 3px;
-    background: rgba(140, 140, 145, 0.35); overflow: hidden;
+    background: rgba(140, 140, 145, 0.35);
   }
   .grp.compact-weekly .track { width: 120px; }
   .fill { height: 100%; border-radius: 3px; width: 0%; }
+  .guide {
+    position: absolute; top: 50%; display: none;
+    width: 2px; height: 8.5px; border-radius: 1px;
+    background: #ff6a00; transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.35);
+  }
   .green { background: #35c759; } .amber { background: #ffcc00; } .red { background: #ff453a; }
   #unavailable, #loading { display: none; }
 </style></head><body>
 <div id="row">
   <img id="logo" class="logo" src="data:image/svg+xml;base64,${anthropicIcon}" alt="" />
-  <span id="grp5" class="grp"><span class="label">5H</span><span class="track"><span id="fs" class="fill"></span></span><span id="ps" class="pct"></span></span>
-  <span id="grp7" class="grp"><span class="label">7D</span><span class="track"><span id="fw" class="fill"></span></span><span id="pw" class="pct"></span></span>
+  <span id="grp5" class="grp"><span class="label">5H</span><span class="track"><span id="fs" class="fill"></span><span id="gs" class="guide"></span></span><span id="ps" class="pct"></span></span>
+  <span id="grp7" class="grp"><span class="label">7D</span><span class="track"><span id="fw" class="fill"></span><span id="gw" class="guide"></span></span><span id="pw" class="pct"></span></span>
   <span id="unavailable">Unavailable</span>
   <span id="loading">Loading...</span>
 </div>
@@ -47,8 +54,15 @@ const PAGE = `
     var c = Math.max(0, Math.min(100, v === null ? 0 : v));
     f.style.width = c + '%'; f.className = 'fill ' + cls(c); p.textContent = Math.round(c) + '%'; p.className = 'pct';
   }
+  // Paced-usage marker: where usage "should" be given how much of the window elapsed.
+  function guide(guideId, resetsAt, durSec, nowSec, show){
+    var g = document.getElementById(guideId);
+    if (!show || resetsAt === null) { g.style.display = 'none'; return; }
+    var e = Math.max(0, Math.min(100, ((durSec - (resetsAt - nowSec)) / durSec) * 100));
+    g.style.display = 'block'; g.style.left = e + '%';
+  }
   var logos = { claude: 'data:image/svg+xml;base64,${anthropicIcon}', codex: 'data:image/svg+xml;base64,${openaiIcon}' };
-  window.__render = function(provider, s, w, showSession, showWeekly, compactWeekly, loading, unavailable){
+  window.__render = function(provider, s, w, sReset, wReset, nowSec, showPaceLine, showSession, showWeekly, compactWeekly, loading, unavailable){
     // Always render white: macOS doesn't expose the menu-bar backdrop luminance,
     // and the menu bar is dark far more often than not (translucent over wallpaper).
     document.documentElement.style.color = '#f2f2f2';
@@ -65,8 +79,8 @@ const PAGE = `
     } else if (loading) {
       ld.style.display = 'inline-flex';
     } else {
-      if (showSession) { grp5.style.display = 'inline-flex'; seg('fs', 'ps', s); }
-      if (showWeekly) { grp7.style.display = 'inline-flex'; seg('fw', 'pw', w); }
+      if (showSession) { grp5.style.display = 'inline-flex'; seg('fs', 'ps', s); guide('gs', sReset, ${5 * 3600}, nowSec, showPaceLine); }
+      if (showWeekly) { grp7.style.display = 'inline-flex'; seg('fw', 'pw', w); guide('gw', wReset, ${7 * 24 * 3600}, nowSec, showPaceLine); }
     }
     return Math.ceil(row.getBoundingClientRect().width);
   };
@@ -94,12 +108,14 @@ const j = (v: number | null): string => (v === null ? "null" : String(v));
 
 export async function renderTray(
   display: TrayDisplayState,
+  showPaceLine: boolean,
 ): Promise<NativeImage> {
   await ensure();
   const wc = win!.webContents;
   const presentation = trayWindowPresentation(display);
+  const nowSec = Math.floor(Date.now() / 1000);
   const width: number = await wc.executeJavaScript(
-    `window.__render(${JSON.stringify(display.provider)}, ${j(display.session)}, ${j(display.weekly)}, ${presentation.session}, ${presentation.weekly}, ${presentation.compactWeekly}, ${display.loading}, ${display.unavailable})`,
+    `window.__render(${JSON.stringify(display.provider)}, ${j(display.session)}, ${j(display.weekly)}, ${j(display.sessionResetsAt)}, ${j(display.weeklyResetsAt)}, ${nowSec}, ${showPaceLine}, ${presentation.session}, ${presentation.weekly}, ${presentation.compactWeekly}, ${display.loading}, ${display.unavailable})`,
   );
   const w = Math.max(1, Math.min(320, width));
   win!.setContentSize(w, H);
