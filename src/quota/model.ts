@@ -45,3 +45,23 @@ export function quotaFromOAuthUsage(usage: unknown, updatedAt: number): Quota {
     planDetected: session !== null || weekly !== null,
   };
 }
+
+function toCodexWindow(value: unknown): QuotaWindow | null {
+  if (!value || typeof value !== "object") { return null; }
+  const window = value as Record<string, unknown>;
+  if (typeof window.usedPercent !== "number") { return null; }
+  if (!(typeof window.resetsAt === "number" || window.resetsAt === null)) { return null; }
+  return { usedPct: window.usedPercent, resetsAt: window.resetsAt };
+}
+
+export function quotaFromCodexRateLimits(response: unknown, updatedAt: number): Quota {
+  const value = (response ?? {}) as Record<string, unknown>;
+  const byId = value.rateLimitsByLimitId;
+  const codex = byId && typeof byId === "object"
+    ? (byId as Record<string, unknown>).codex
+    : undefined;
+  const snapshot = (codex ?? value.rateLimits ?? {}) as Record<string, unknown>;
+  const session = toCodexWindow(snapshot.primary);
+  const weekly = toCodexWindow(snapshot.secondary);
+  return { updatedAt, session, weekly, planDetected: session !== null || weekly !== null };
+}
