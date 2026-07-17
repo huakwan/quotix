@@ -1,42 +1,80 @@
-import { app } from "electron";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { Quota, QuotaWindow } from "./model";
+import type { ProviderId, Quota, QuotaWindow } from "./model";
 
-// Persists the last successfully-fetched quota so the tray can show real numbers
-// immediately on launch instead of a loading state while the first poll runs —
-// and to survive frequent 429 rate-limit stretches across restarts.
-
-function cachePath(): string {
-  return join(app.getPath("userData"), "quotix-quota-cache.json");
+export interface QuotaCache {
+  readonly path: string;
+  load(): Quota | null;
+  save(quota: Quota): void;
 }
 
-function normWindow(w: unknown): QuotaWindow | null {
-  if (!w || typeof w !== "object") { return null; }
-  const o = w as Record<string, unknown>;
-  if (typeof o.usedPct !== "number") { return null; }
-  return { usedPct: o.usedPct, resetsAt: typeof o.resetsAt === "number" ? o.resetsAt : null };
+interface CacheDeps {
+  readFile(path: string): string;
+  writeFile(path: string, value: string): void;
+}
+
+const defaultDeps: CacheDeps = {
+  readFile: (path) => readFileSync(path, "utf8"),
+  writeFile: (path, value) => writeFileSync(path, value, "utf8"),
+};
+
+function normWindow(value: unknown): QuotaWindow | null {
+  if (value === null) { return null; }
+  if (!value || typeof value !== "object") { throw new Error("invalid quota window"); }
+  const window = value as Record<string, unknown>;
+  if (typeof window.usedPct !== "number") { throw new Error("invalid usage"); }
+  if (!(typeof window.resetsAt === "number" || window.resetsAt === null)) {
+    throw new Error("invalid reset");
+  }
+  return { usedPct: window.usedPct, resetsAt: window.resetsAt };
+}
+
+function parseQuota(raw: string): Quota {
+  const value = JSON.parse(raw) as Record<string, unknown>;
+  if (typeof value.updatedAt !== "number") { throw new Error("invalid timestamp"); }
+  return {
+    updatedAt: value.updatedAt,
+    session: normWindow(value.session),
+    weekly: normWindow(value.weekly),
+    planDetected: value.planDetected === true,
+  };
+}
+
+export function createQuotaCache(
+  userDataDir: string,
+  provider: ProviderId,
+  deps: CacheDeps = defaultDeps,
+): QuotaCache {
+  const path = join(userDataDir, `quotix-quota-cache-${provider}.json`);
+  const legacyPath = join(userDataDir, "quotix-quota-cache.json");
+  return {
+    path,
+    load: () => {
+      try { return parseQuota(deps.readFile(path)); }
+      catch {
+        if (provider !== "claude") { return null; }
+        try { return parseQuota(deps.readFile(legacyPath)); }
+        catch { return null; }
+      }
+    },
+    save: (quota) => {
+      try { deps.writeFile(path, JSON.stringify(quota)); }
+      catch { /* best effort */ }
+    },
+  };
+}
+
+// Compatibility for the current composition root; removed when main.ts adopts
+// provider-specific caches.
+function electronUserDataDir(): string {
+  const { app } = require("electron") as typeof import("electron");
+  return app.getPath("userData");
 }
 
 export function loadQuotaCache(): Quota | null {
-  try {
-    const parsed = JSON.parse(readFileSync(cachePath(), "utf8")) as Record<string, unknown>;
-    if (typeof parsed.updatedAt !== "number") { return null; }
-    return {
-      updatedAt: parsed.updatedAt,
-      session: normWindow(parsed.session),
-      weekly: normWindow(parsed.weekly),
-      planDetected: parsed.planDetected === true,
-    };
-  } catch {
-    return null;
-  }
+  return createQuotaCache(electronUserDataDir(), "claude").load();
 }
 
 export function saveQuotaCache(quota: Quota): void {
-  try {
-    writeFileSync(cachePath(), JSON.stringify(quota), "utf8");
-  } catch {
-    /* best-effort: never crash the app on a read-only home */
-  }
+  createQuotaCache(electronUserDataDir(), "claude").save(quota);
 }

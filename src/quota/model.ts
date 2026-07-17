@@ -10,9 +10,21 @@ export interface Quota {
   planDetected: boolean;
 }
 
+export type ProviderId = "claude" | "codex";
+export type DisplaySource = ProviderId | "both";
+
 export type ReadResult =
   | { ok: true; quota: Quota; diagnostic?: string }
   | { ok: false; reason: "missing" | "corrupt"; error?: string };
+
+export interface SourceState {
+  enabled: boolean;
+  loading: boolean;
+  result: ReadResult;
+  lastGood: Quota | null;
+}
+
+export type QuotaSnapshot = Record<ProviderId, SourceState>;
 
 function toOAuthWindow(w: unknown): QuotaWindow | null {
   if (!w || typeof w !== "object") { return null; }
