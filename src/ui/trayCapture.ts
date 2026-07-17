@@ -1,6 +1,7 @@
 import { trayWindowPresentation, type TrayDisplayState } from "./trayState";
 import anthropicIcon from "../../assets/anthropic.svg";
 import openaiIcon from "../../assets/openai.svg";
+import pageTemplate from "./trayCapture.html";
 import { BrowserWindow, NativeImage, nativeImage, screen } from "electron";
 
 // Renders the tray's available inline quota rows with the real system font by
@@ -10,82 +11,14 @@ import { BrowserWindow, NativeImage, nativeImage, screen } from "electron";
 
 const H = 22; // logical height ~= macOS menu-bar height, so the OS centers it cleanly
 
-const PAGE = `
-<!doctype html><html><head><meta charset="utf-8" />
-<style>
-  html, body { margin: 0; padding: 0; background: transparent; }
-  #row {
-    display: inline-flex; align-items: center; gap: 9px;
-    height: ${H}px; line-height: ${H}px; padding: 0 3px; white-space: nowrap;
-    font: 13px -apple-system, system-ui, sans-serif; font-weight: 500;
-  }
-  #row > * { display: inline-flex; align-items: center; }
-  .grp { gap: 5px; }
-  .logo { width: 15px; height: 15px; display: block; }
-  .label { opacity: 0.65; }
-  .pct { font-variant-numeric: tabular-nums; }
-  .track {
-    position: relative;
-    display: inline-flex; width: 80px; height: 6px; border-radius: 3px;
-    background: rgba(140, 140, 145, 0.35);
-  }
-  .grp.compact-weekly .track { width: 120px; }
-  .fill { height: 100%; border-radius: 3px; width: 0%; }
-  .guide {
-    position: absolute; top: 50%; display: none;
-    width: 2px; height: 8.5px; border-radius: 1px;
-    background: #ff6a00; transform: translate(-50%, -50%);
-    box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.35);
-  }
-  .green { background: #35c759; } .amber { background: #ffcc00; } .red { background: #ff453a; }
-  #unavailable, #loading { display: none; }
-</style></head><body>
-<div id="row">
-  <img id="logo" class="logo" src="data:image/svg+xml;base64,${anthropicIcon}" alt="" />
-  <span id="grp5" class="grp"><span class="label">5H</span><span class="track"><span id="fs" class="fill"></span><span id="gs" class="guide"></span></span><span id="ps" class="pct"></span></span>
-  <span id="grp7" class="grp"><span class="label">7D</span><span class="track"><span id="fw" class="fill"></span><span id="gw" class="guide"></span></span><span id="pw" class="pct"></span></span>
-  <span id="unavailable">Unavailable</span>
-  <span id="loading">Loading...</span>
-</div>
-<script>
-  function cls(p){ return p > 90 ? 'red' : p >= 75 ? 'amber' : 'green'; }
-  function seg(fillId, pctId, v){
-    var f = document.getElementById(fillId), p = document.getElementById(pctId);
-    var c = Math.max(0, Math.min(100, v === null ? 0 : v));
-    f.style.width = c + '%'; f.className = 'fill ' + cls(c); p.textContent = Math.round(c) + '%'; p.className = 'pct';
-  }
-  // Paced-usage marker: where usage "should" be given how much of the window elapsed.
-  function guide(guideId, resetsAt, durSec, nowSec, show){
-    var g = document.getElementById(guideId);
-    if (!show || resetsAt === null) { g.style.display = 'none'; return; }
-    var e = Math.max(0, Math.min(100, ((durSec - (resetsAt - nowSec)) / durSec) * 100));
-    g.style.display = 'block'; g.style.left = e + '%';
-  }
-  var logos = { claude: 'data:image/svg+xml;base64,${anthropicIcon}', codex: 'data:image/svg+xml;base64,${openaiIcon}' };
-  window.__render = function(provider, s, w, sReset, wReset, nowSec, showPaceLine, showSession, showWeekly, compactWeekly, loading, unavailable){
-    // Always render white: macOS doesn't expose the menu-bar backdrop luminance,
-    // and the menu bar is dark far more often than not (translucent over wallpaper).
-    document.documentElement.style.color = '#f2f2f2';
-    var logo = document.getElementById('logo');
-    logo.src = logos[provider];
-    logo.style.filter = provider === 'codex' ? 'invert(1)' : 'none';
-    var row = document.getElementById('row');
-    var grp5 = document.getElementById('grp5'), grp7 = document.getElementById('grp7');
-    var una = document.getElementById('unavailable'), ld = document.getElementById('loading');
-    grp7.classList.toggle('compact-weekly', compactWeekly);
-    grp5.style.display = 'none'; grp7.style.display = 'none'; una.style.display = 'none'; ld.style.display = 'none';
-    if (unavailable) {
-      una.style.display = 'inline-flex';
-    } else if (loading) {
-      ld.style.display = 'inline-flex';
-    } else {
-      if (showSession) { grp5.style.display = 'inline-flex'; seg('fs', 'ps', s); guide('gs', sReset, ${5 * 3600}, nowSec, showPaceLine); }
-      if (showWeekly) { grp7.style.display = 'inline-flex'; seg('fw', 'pw', w); guide('gw', wReset, ${7 * 24 * 3600}, nowSec, showPaceLine); }
-    }
-    return Math.ceil(row.getBoundingClientRect().width);
-  };
-</script>
-</body></html>`;
+// The markup/styles live in ./trayCapture.html with build-time placeholders that
+// carry values the layout depends on (row height, icon assets, window durations).
+const PAGE = pageTemplate
+  .replaceAll("__H__", String(H))
+  .replaceAll("__ICON_CLAUDE__", anthropicIcon)
+  .replaceAll("__ICON_CODEX__", openaiIcon)
+  .replace("__SESSION_DUR__", String(5 * 3600))
+  .replace("__WEEKLY_DUR__", String(7 * 24 * 3600));
 
 let win: BrowserWindow | undefined;
 let ready: Promise<void> | undefined;

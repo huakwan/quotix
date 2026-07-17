@@ -3,3 +3,9 @@ declare module "*.svg" {
   const base64: string;
   export default base64;
 }
+
+// esbuild imports .html via the "text" loader → the file contents as a string.
+declare module "*.html" {
+  const html: string;
+  export default html;
+}

@@ -18,7 +18,7 @@ async function main() {
   const node = {
     bundle: true, format: "cjs", platform: "node", target: "node20",
     external: ["electron"], sourcemap: true, logLevel: "info",
-    loader: { ".svg": "base64" },
+    loader: { ".svg": "base64", ".html": "text" },
   };
   const contexts = await Promise.all([
     esbuild.context({ ...node, entryPoints: ["src/main.ts"], outfile: "dist/main.js" }),
