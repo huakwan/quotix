@@ -39,12 +39,20 @@ test("tray selector distinguishes loading and unavailable", () => {
   assert.equal(missing.unavailable, true);
 });
 
-test("tray visibility follows available normalized windows", () => {
-  assert.deepEqual(trayWindowVisibility({
+test("tray visibility keeps both Claude windows but filters missing Codex windows", () => {
+  const weeklyOnly = {
     provider: "codex",
     session: null,
     weekly: 31,
     loading: false,
     unavailable: false,
-  }), { session: false, weekly: true });
+  };
+  assert.deepEqual(trayWindowVisibility({ ...weeklyOnly, provider: "claude" }), {
+    session: true,
+    weekly: true,
+  });
+  assert.deepEqual(trayWindowVisibility(weeklyOnly), {
+    session: false,
+    weekly: true,
+  });
 });

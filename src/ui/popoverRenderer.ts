@@ -1,6 +1,6 @@
 import type { DisplaySource, ProviderId, QuotaWindow, SourceState } from "../quota/model";
 import type { ResetMode } from "../preferences";
-import { availableQuotaRows, sectionsForPayload, showMenuBarSetting, type PopoverPayload } from "./popoverState";
+import { quotaRowsForProvider, sectionsForPayload, showMenuBarSetting, type PopoverPayload } from "./popoverState";
 
 declare global {
   interface Window {
@@ -92,7 +92,7 @@ function sectionHtml(provider: ProviderId, name: string, state: SourceState, pay
   const logo = provider === "claude" ? "../assets/anthropic.svg" : "../assets/openai.svg";
   const quota = state.lastGood ?? (state.result.ok ? state.result.quota : null);
   const body = quota
-    ? availableQuotaRows(quota)
+    ? quotaRowsForProvider(provider, quota)
       .map((row) => rowHtml(row.label, row.window, payload.nowSec, payload.preferences.resetMode))
       .join("")
       + `<div class="updated">${updatedAgo(quota.updatedAt, payload.nowSec)}</div>`

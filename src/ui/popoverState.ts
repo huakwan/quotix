@@ -15,10 +15,16 @@ export interface PopoverSection {
 
 export interface QuotaRow {
   label: "5H" | "7D";
-  window: QuotaWindow;
+  window: QuotaWindow | null;
 }
 
-export function availableQuotaRows(quota: Quota): QuotaRow[] {
+export function quotaRowsForProvider(provider: ProviderId, quota: Quota): QuotaRow[] {
+  if (provider === "claude") {
+    return [
+      { label: "5H", window: quota.session },
+      { label: "7D", window: quota.weekly },
+    ];
+  }
   const rows: QuotaRow[] = [];
   if (quota.session) { rows.push({ label: "5H", window: quota.session }); }
   if (quota.weekly) { rows.push({ label: "7D", window: quota.weekly }); }
