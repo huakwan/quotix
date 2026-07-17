@@ -54,6 +54,28 @@ function toCodexWindow(value: unknown): QuotaWindow | null {
   return { usedPct: window.usedPercent, resetsAt: window.resetsAt };
 }
 
+const WEEKLY_WINDOW_MINS = 7 * 24 * 60;
+
+function codexWindowDuration(value: unknown): number | null {
+  if (!value || typeof value !== "object") { return null; }
+  const duration = (value as Record<string, unknown>).windowDurationMins;
+  return typeof duration === "number" && duration > 0 ? duration : null;
+}
+
+function assignCodexWindow(
+  slots: { session: QuotaWindow | null; weekly: QuotaWindow | null },
+  value: unknown,
+  legacySlot: "session" | "weekly",
+): void {
+  const window = toCodexWindow(value);
+  if (!window) { return; }
+  const duration = codexWindowDuration(value);
+  const slot = duration === null
+    ? legacySlot
+    : duration >= WEEKLY_WINDOW_MINS ? "weekly" : "session";
+  if (slots[slot] === null) { slots[slot] = window; }
+}
+
 export function quotaFromCodexRateLimits(response: unknown, updatedAt: number): Quota {
   const value = (response ?? {}) as Record<string, unknown>;
   const byId = value.rateLimitsByLimitId;
@@ -61,7 +83,15 @@ export function quotaFromCodexRateLimits(response: unknown, updatedAt: number): 
     ? (byId as Record<string, unknown>).codex
     : undefined;
   const snapshot = (codex ?? value.rateLimits ?? {}) as Record<string, unknown>;
-  const session = toCodexWindow(snapshot.primary);
-  const weekly = toCodexWindow(snapshot.secondary);
-  return { updatedAt, session, weekly, planDetected: session !== null || weekly !== null };
+  const slots: { session: QuotaWindow | null; weekly: QuotaWindow | null } = {
+    session: null,
+    weekly: null,
+  };
+  assignCodexWindow(slots, snapshot.primary, "session");
+  assignCodexWindow(slots, snapshot.secondary, "weekly");
+  return {
+    updatedAt,
+    ...slots,
+    planDetected: slots.session !== null || slots.weekly !== null,
+  };
 }

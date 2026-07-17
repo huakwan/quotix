@@ -17,6 +17,25 @@ test("maps the named Codex bucket before the legacy rateLimits field", () => {
   assert.equal(quota.weekly.usedPct, 22);
 });
 
+test("classifies Codex windows by reported duration", () => {
+  const weeklyOnly = quotaFromCodexRateLimits({
+    rateLimitsByLimitId: { codex: {
+      primary: { usedPercent: 31, resetsAt: 900, windowDurationMins: 10_080 },
+    } },
+  }, 100);
+  assert.equal(weeklyOnly.session, null);
+  assert.deepEqual(weeklyOnly.weekly, { usedPct: 31, resetsAt: 900 });
+
+  const dual = quotaFromCodexRateLimits({
+    rateLimitsByLimitId: { codex: {
+      primary: { usedPercent: 12, resetsAt: 200, windowDurationMins: 300 },
+      secondary: { usedPercent: 34, resetsAt: 800, windowDurationMins: 10_080 },
+    } },
+  }, 100);
+  assert.equal(dual.session.usedPct, 12);
+  assert.equal(dual.weekly.usedPct, 34);
+});
+
 test("provider maps success and disposes its client", async () => {
   let disposed = false;
   const client = { readRateLimits: async () => ({ rateLimits: { primary: { usedPercent: 10, resetsAt: 200 } } }), dispose: () => { disposed = true; } };
