@@ -21,7 +21,7 @@ test("both returns stable Claude then Codex sections", () => {
   const sections = sectionsForPayload(payload("both"));
   assert.deepEqual(sections.map((section) => section.provider), ["claude", "codex"]);
   assert.equal(sections[0].name, "Claude Code");
-  assert.equal(sections[1].name, "Codex");
+  assert.equal(sections[1].name, "Codex OpenAI");
   assert.equal(sections[1].state.result.error, "no cli");
 });
 

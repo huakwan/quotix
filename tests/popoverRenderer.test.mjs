@@ -15,12 +15,12 @@ function loadUpdatedAgo() {
   return runInNewContext(`(${javascript})`);
 }
 
-test("updated age uses seconds only after five seconds and before one minute", () => {
+test("updated age uses seconds only after ten seconds and before one minute", () => {
   const updatedAgo = loadUpdatedAgo();
 
-  assert.equal(updatedAgo(100, 95), "Updated just now");
-  assert.equal(updatedAgo(100, 105), "Updated just now");
-  assert.equal(updatedAgo(100, 106), "Updated 6 sec ago");
-  assert.equal(updatedAgo(100, 159), "Updated 59 sec ago");
-  assert.equal(updatedAgo(100, 160), "Updated 1 min ago");
+  assert.equal(updatedAgo(100, 95), "updated just now");
+  assert.equal(updatedAgo(100, 110), "updated just now");
+  assert.equal(updatedAgo(100, 111), "updated 11 sec ago");
+  assert.equal(updatedAgo(100, 159), "updated 59 sec ago");
+  assert.equal(updatedAgo(100, 160), "updated 1 min ago");
 });
