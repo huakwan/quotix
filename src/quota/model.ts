@@ -10,9 +10,21 @@ export interface Quota {
   planDetected: boolean;
 }
 
+export type ProviderId = "claude" | "codex";
+export type DisplaySource = ProviderId | "both";
+
 export type ReadResult =
   | { ok: true; quota: Quota; diagnostic?: string }
   | { ok: false; reason: "missing" | "corrupt"; error?: string };
+
+export interface SourceState {
+  enabled: boolean;
+  loading: boolean;
+  result: ReadResult;
+  lastGood: Quota | null;
+}
+
+export type QuotaSnapshot = Record<ProviderId, SourceState>;
 
 function toOAuthWindow(w: unknown): QuotaWindow | null {
   if (!w || typeof w !== "object") { return null; }
@@ -32,4 +44,24 @@ export function quotaFromOAuthUsage(usage: unknown, updatedAt: number): Quota {
     weekly,
     planDetected: session !== null || weekly !== null,
   };
+}
+
+function toCodexWindow(value: unknown): QuotaWindow | null {
+  if (!value || typeof value !== "object") { return null; }
+  const window = value as Record<string, unknown>;
+  if (typeof window.usedPercent !== "number") { return null; }
+  if (!(typeof window.resetsAt === "number" || window.resetsAt === null)) { return null; }
+  return { usedPct: window.usedPercent, resetsAt: window.resetsAt };
+}
+
+export function quotaFromCodexRateLimits(response: unknown, updatedAt: number): Quota {
+  const value = (response ?? {}) as Record<string, unknown>;
+  const byId = value.rateLimitsByLimitId;
+  const codex = byId && typeof byId === "object"
+    ? (byId as Record<string, unknown>).codex
+    : undefined;
+  const snapshot = (codex ?? value.rateLimits ?? {}) as Record<string, unknown>;
+  const session = toCodexWindow(snapshot.primary);
+  const weekly = toCodexWindow(snapshot.secondary);
+  return { updatedAt, session, weekly, planDetected: session !== null || weekly !== null };
 }

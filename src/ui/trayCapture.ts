@@ -1,5 +1,7 @@
 import anthropicIcon from "../../assets/anthropic.svg";
+import openaiIcon from "../../assets/openai.svg";
 import { BrowserWindow, NativeImage, nativeImage, screen } from "electron";
+import type { TrayDisplayState } from "./trayState";
 
 // Renders the tray's inline row (5H [bar] % | 7D [bar] %) with the real system
 // font by laying it out in a hidden BrowserWindow and capturing it to a NativeImage.
@@ -31,7 +33,7 @@ const PAGE = `
   #unavailable, #loading { display: none; }
 </style></head><body>
 <div id="row">
-  <img class="logo" src="data:image/svg+xml;base64,${anthropicIcon}" alt="" />
+  <img id="logo" class="logo" src="data:image/svg+xml;base64,${anthropicIcon}" alt="" />
   <span id="grp5" class="grp"><span class="label">5H</span><span class="track"><span id="fs" class="fill"></span></span><span id="ps" class="pct"></span></span>
   <span id="grp7" class="grp"><span class="label">7D</span><span class="track"><span id="fw" class="fill"></span></span><span id="pw" class="pct"></span></span>
   <span id="unavailable">Unavailable</span>
@@ -44,8 +46,10 @@ const PAGE = `
     var c = Math.max(0, Math.min(100, v === null ? 0 : v));
     f.style.width = c + '%'; f.className = 'fill ' + cls(c); p.textContent = Math.round(c) + '%'; p.className = 'pct';
   }
-  window.__render = function(s, w, dark, loading, unavailable){
+  var logos = { claude: 'data:image/svg+xml;base64,${anthropicIcon}', codex: 'data:image/svg+xml;base64,${openaiIcon}' };
+  window.__render = function(provider, s, w, dark, loading, unavailable){
     document.documentElement.style.color = dark ? '#f2f2f2' : '#1c1c1e';
+    document.getElementById('logo').src = logos[provider];
     var row = document.getElementById('row');
     var grp5 = document.getElementById('grp5'), grp7 = document.getElementById('grp7');
     var una = document.getElementById('unavailable'), ld = document.getElementById('loading');
@@ -82,22 +86,14 @@ function ensure(): Promise<void> {
 
 const j = (v: number | null): string => (v === null ? "null" : String(v));
 
-export interface TrayMode {
-  loading: boolean;
-  tokenMissing: boolean;
-}
-
 export async function renderTray(
-  session: number | null,
-  weekly: number | null,
+  display: TrayDisplayState,
   dark: boolean,
-  mode: TrayMode = { loading: false, tokenMissing: false },
 ): Promise<NativeImage> {
   await ensure();
   const wc = win!.webContents;
-  const { loading, tokenMissing } = mode;
   const width: number = await wc.executeJavaScript(
-    `window.__render(${j(session)}, ${j(weekly)}, ${dark}, ${loading}, ${tokenMissing})`,
+    `window.__render(${JSON.stringify(display.provider)}, ${j(display.session)}, ${j(display.weekly)}, ${dark}, ${display.loading}, ${display.unavailable})`,
   );
   const w = Math.max(1, Math.min(320, width));
   win!.setContentSize(w, H);

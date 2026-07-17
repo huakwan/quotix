@@ -1,28 +1,37 @@
 # Quotix
 
-Show Claude Code usage quota in the macOS menu bar.
+Show Claude Code and Codex usage quota in the macOS menu bar.
 
-Quotix is a small Electron menu bar app that reads your Claude Code OAuth
-credentials from the macOS Keychain, polls the Anthropic usage API, and
-displays your session and weekly quota utilization right in the menu bar.
+Quotix is a small Electron menu bar app that polls the local signed-in sessions
+used by Claude Code and Codex. The menu bar shows one source; clicking it opens
+a popover with Claude, Codex, or both.
 
 ## Features
 
-- Live session (5-hour) quota bar with percent used and time until reset
-- Tooltip with session + weekly utilization and last-updated timestamp
-- Reads the same credentials Claude Code already stores in Keychain — no
-  extra login step
-- Backs off automatically on rate limits (`429`) and clears stale tokens on
-  `401`
-- Menu bar only — no dock icon, no windows
+- Claude and Codex 5-hour/session and 7-day/weekly quota bars
+- Popover source setting: `Claude`, `Codex`, or `Both`
+- Independent menu-bar source setting while `Both` is selected
+- Shared two-minute poll cadence with independent in-flight and rate-limit state
+- Separate last-good caches so one provider's failure never hides the other
+- Live reset countdown or wall-clock reset time
+- Menu-bar-only macOS app with no dock icon
+
+Defaults are `Source: Both`, `Menu bar: Claude`, and `Reset time: Countdown`.
+When a single source is selected, the menu bar automatically follows that
+source. Returning to Both restores the last explicit menu-bar choice.
 
 ## Requirements
 
-- macOS (reads credentials via the `security` CLI / Keychain — this is the
-  only supported platform)
-- Node.js
-- An active Claude Code login (so `Claude Code-credentials` exists in
-  Keychain)
+- macOS
+- Node.js and pnpm for development
+- Claude: sign in once with Claude Code so its OAuth credential exists in
+  macOS Keychain
+- Codex: sign in with Codex CLI or the official OpenAI VS Code extension
+
+Codex executable discovery checks `CODEX_PATH`, official OpenAI extensions in
+VS Code-compatible extension directories, `PATH`, and common CLI install
+locations. Codex quota is read through `codex app-server --stdio`; Quotix never
+stores account credentials or raw app-server payloads.
 
 ## Getting started
 
@@ -31,36 +40,28 @@ pnpm install
 pnpm start
 ```
 
-`pnpm start` compiles the TypeScript sources with esbuild and launches the
-Electron app.
-
 ## Scripts
 
-| Script          | Description                                      |
-| --------------- | ------------------------------------------------- |
-| `pnpm run compile` | Bundle `src/main.ts` to `dist/main.js` via esbuild |
-| `pnpm run watch`   | Same as `compile`, but watches for changes         |
-| `pnpm start`       | Compile, then launch the Electron app              |
-| `pnpm run dist:mac` | Compile, then package a `.app` with electron-builder (unpacked dir target) |
+| Script | Description |
+| --- | --- |
+| `pnpm run compile` | Bundle the Electron main, preload, and popover renderer files. |
+| `pnpm run typecheck` | Run strict TypeScript checking without emitting files. |
+| `pnpm test` | Compile TypeScript to `out/` and run the Node unit suite. |
+| `pnpm run watch` | Rebuild bundles continuously. |
+| `pnpm start` | Compile and launch Quotix. |
+| `pnpm run dist:mac` | Build an unpacked macOS `.app`. |
 
-## How it works
+## Architecture
 
-- `src/oauthCredentials.ts` — reads the `Claude Code-credentials` entry from
-  Keychain (sync read on startup, async refresh in the background) and
-  extracts the OAuth access token
-- `src/oauthSource.ts` — calls `https://api.anthropic.com/api/oauth/usage`
-  with that token and maps the response (or errors/rate limits) into a
-  `ReadResult`
-- `src/model.ts` — shapes the raw API usage payload into session/weekly
-  `Quota` windows
-- `src/render.ts` — formats quota data into the tray title/tooltip text
-  (progress bar, percentage, countdown)
-- `src/main.ts` — wires it together: polls on an interval, renders to the
-  `Tray`, and re-renders every 10s so the countdown stays live between polls
+- `src/quota/provider.ts` defines the common provider contract.
+- `src/quota/sourceRuntime.ts` owns per-provider cache, loading, in-flight, and
+  backoff state.
+- `src/quota/coordinator.ts` enables providers and polls them concurrently.
+- `src/quota/claude/` reads Keychain credentials and Anthropic OAuth usage.
+- `src/quota/codex/` discovers Codex, manages app-server JSON-RPC, and maps
+  account rate limits.
+- `src/preferences.ts` validates and persists source/menu/reset settings.
+- `src/main.ts` composes Electron, providers, tray, popover, and IPC.
 
-## Notes
-
-- Quotix only reads your local Keychain entry; it does not store or
-  transmit credentials anywhere beyond the standard Anthropic API request.
-- Packaging (`pnpm run dist:mac`) currently targets an unpacked `.app`
-  directory, not a signed/notarized installer.
+Only successful normalized quota data is cached. Claude and Codex caches are
+separate, and the legacy Claude cache is still accepted as a startup fallback.
