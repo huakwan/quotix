@@ -86,35 +86,12 @@ function ensure(): Promise<void> {
 
 const j = (v: number | null): string => (v === null ? "null" : String(v));
 
-export interface TrayMode {
-  loading: boolean;
-  tokenMissing: boolean;
-}
-
 export async function renderTray(
   display: TrayDisplayState,
   dark: boolean,
-): Promise<NativeImage>;
-export async function renderTray(
-  session: number | null, weekly: number | null, dark: boolean, mode?: TrayMode,
-): Promise<NativeImage>;
-export async function renderTray(
-  displayOrSession: TrayDisplayState | number | null,
-  weeklyOrDark: number | null | boolean,
-  darkOrMode?: boolean | TrayMode,
-  legacyMode: TrayMode = { loading: false, tokenMissing: false },
 ): Promise<NativeImage> {
   await ensure();
   const wc = win!.webContents;
-  const modern = typeof displayOrSession === "object" && displayOrSession !== null;
-  const display = modern ? displayOrSession : {
-    provider: "claude" as const,
-    session: displayOrSession,
-    weekly: weeklyOrDark as number | null,
-    loading: (darkOrMode as TrayMode | undefined)?.loading ?? legacyMode.loading,
-    unavailable: (darkOrMode as TrayMode | undefined)?.tokenMissing ?? legacyMode.tokenMissing,
-  };
-  const dark = modern ? weeklyOrDark as boolean : darkOrMode as boolean;
   const width: number = await wc.executeJavaScript(
     `window.__render(${JSON.stringify(display.provider)}, ${j(display.session)}, ${j(display.weekly)}, ${dark}, ${display.loading}, ${display.unavailable})`,
   );

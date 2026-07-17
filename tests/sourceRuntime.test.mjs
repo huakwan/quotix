@@ -79,3 +79,21 @@ test("rate-limit backoff blocks force refresh and grows exponentially", async ()
   await h.runtime.poll();
   assert.equal(h.provider.calls, 3);
 });
+
+test("rate-limit backoff starts when the failed request finishes", async () => {
+  let resolve;
+  const pending = new Promise((done) => { resolve = done; });
+  const h = harness([{ ok: true, quota }]);
+  h.provider.read = async () => { h.provider.calls += 1; return pending; };
+  const request = h.runtime.poll();
+  h.setNow(30_000);
+  resolve({ ok: false, kind: "rate-limited", error: "429", retryAfterSeconds: 60 });
+  await request;
+  h.provider.read = async () => { h.provider.calls += 1; return { ok: true, quota }; };
+  h.setNow(60_000);
+  await h.runtime.poll();
+  assert.equal(h.provider.calls, 1);
+  h.setNow(90_000);
+  await h.runtime.poll();
+  assert.equal(h.provider.calls, 2);
+});

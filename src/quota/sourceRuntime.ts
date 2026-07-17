@@ -61,7 +61,7 @@ export class SourceRuntime {
           this.consecutiveRateLimits += 1;
           const base = result.retryAfterSeconds ?? DEFAULT_BACKOFF_SECONDS;
           const seconds = Math.min(base * 2 ** (this.consecutiveRateLimits - 1), MAX_BACKOFF_SECONDS);
-          this.backoffUntilMs = startedAtMs + seconds * 1000;
+          this.backoffUntilMs = this.deps.nowMs() + seconds * 1000;
         } else {
           this.consecutiveRateLimits = 0;
           this.backoffUntilMs = 0;

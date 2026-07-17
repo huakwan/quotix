@@ -63,18 +63,3 @@ export function createQuotaCache(
     },
   };
 }
-
-// Compatibility for the current composition root; removed when main.ts adopts
-// provider-specific caches.
-function electronUserDataDir(): string {
-  const { app } = require("electron") as typeof import("electron");
-  return app.getPath("userData");
-}
-
-export function loadQuotaCache(): Quota | null {
-  return createQuotaCache(electronUserDataDir(), "claude").load();
-}
-
-export function saveQuotaCache(quota: Quota): void {
-  createQuotaCache(electronUserDataDir(), "claude").save(quota);
-}
