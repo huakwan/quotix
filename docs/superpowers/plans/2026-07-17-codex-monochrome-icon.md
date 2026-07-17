@@ -39,12 +39,13 @@ test("Codex icon is canonical black", () => {
   assert.doesNotMatch(svg, /#10A37F/i);
 });
 
-test("popover and tray invert only the Codex icon in dark mode", () => {
+test("popover and tray adapt only the Codex icon to the active appearance", () => {
   const renderer = readFileSync(join(root, "src/ui/popoverRenderer.ts"), "utf8");
   const html = readFileSync(join(root, "src/ui/popover.html"), "utf8");
   const tray = readFileSync(join(root, "src/ui/trayCapture.ts"), "utf8");
   assert.match(renderer, /codex-logo/);
-  assert.match(html, /prefers-color-scheme: dark[\s\S]*\.codex-logo[\s\S]*invert\(1\)/);
+  assert.match(html, /\.codex-logo[\s\S]*invert\(1\)/);
+  assert.match(html, /prefers-color-scheme: light[\s\S]*\.codex-logo[\s\S]*filter: none/);
   assert.match(tray, /provider === 'codex' && dark[\s\S]*invert\(1\)/);
 });
 ```
@@ -58,10 +59,14 @@ Expected: FAIL because the SVG is green and no adaptive monochrome rules exist.
 - [ ] **Step 3: Implement the minimal adaptive styling**
 
 Change the SVG path to `fill="#000000"`. Add `codex-logo` only to the Codex
-popover image and this rule inside the existing dark media query:
+popover image. The popover is dark by default, so invert there and cancel the
+filter inside the existing light media query:
 
 ```css
 .codex-logo { filter: invert(1); }
+@media (prefers-color-scheme: light) {
+  .codex-logo { filter: none; }
+}
 ```
 
 In the tray capture renderer, set:

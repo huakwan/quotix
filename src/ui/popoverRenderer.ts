@@ -96,7 +96,7 @@ function sectionHtml(provider: ProviderId, name: string, state: SourceState, pay
       + rowHtml("7D", quota.weekly, payload.nowSec, payload.preferences.resetMode)
       + `<div class="updated">${updatedAgo(quota.updatedAt, payload.nowSec)}</div>`
     : `<div class="unavailable">${unavailableMessage(provider, state)}</div>`;
-  return `<section class="source-section"><div class="header"><img class="logo" src="${logo}" alt=""/>`
+  return `<section class="source-section"><div class="header"><img class="${provider === "codex" ? "logo codex-logo" : "logo"}" src="${logo}" alt=""/>`
     + `<span>${name}</span></div>${body}</section>`;
 }
 
