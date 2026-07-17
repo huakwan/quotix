@@ -56,7 +56,8 @@ function resetText(resetsAt: number | null, nowSec: number, mode: ResetMode): st
 
 function updatedAgo(updatedAt: number, nowSec: number): string {
   const seconds = Math.max(0, nowSec - updatedAt);
-  if (seconds < 60) { return "Updated just now"; }
+  if (seconds <= 5) { return "Updated just now"; }
+  if (seconds < 60) { return `Updated ${seconds} sec ago`; }
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) { return `Updated ${minutes} min ago`; }
   const hours = Math.floor(minutes / 60);
