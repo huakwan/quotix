@@ -13,8 +13,8 @@ export type OAuthFetchResult = ReadResult & { retryAfterSeconds?: number; tokenI
 
 const USAGE_URL = "https://api.anthropic.com/api/oauth/usage";
 const DEFAULT_RATE_LIMIT_BACKOFF_SECONDS = 60;
-const MAX_RATE_LIMIT_BACKOFF_SECONDS = 10 * 60;
-const REQUEST_TIMEOUT_MS = 10_000;
+export const MAX_RATE_LIMIT_BACKOFF_SECONDS = 10 * 60;
+const REQUEST_TIMEOUT_MS = 20_000;
 
 function retryAfterSeconds(res: Response): number {
   const header = res.headers?.get?.("retry-after");

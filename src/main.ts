@@ -1,13 +1,13 @@
 import { app, Tray, Menu, nativeImage, nativeTheme, ipcMain, BrowserWindow } from "electron";
 import { createCachedTokenProvider } from "./quota/oauthCredentials";
-import { fetchOAuthQuota } from "./quota/oauthSource";
+import { fetchOAuthQuota, MAX_RATE_LIMIT_BACKOFF_SECONDS } from "./quota/oauthSource";
 import { trayTooltip } from "./ui/render";
 import { renderTray } from "./ui/trayCapture";
 import { ReadResult } from "./quota/model";
 import { loadQuotaCache, saveQuotaCache } from "./quota/cache";
 import { createPopover, togglePopover } from "./ui/popoverWindow";
 
-const REFRESH_INTERVAL_SECONDS = 60;
+const REFRESH_INTERVAL_SECONDS = 2 * 60;
 
 type OkResult = Extract<ReadResult, { ok: true }>;
 
@@ -17,6 +17,7 @@ let lastResult: ReadResult = { ok: false, reason: "missing" };
 let lastGood: OkResult | null = null;   // survives 429/network errors so the tray keeps showing numbers
 let lastError: string | undefined;      // set while the latest fetch is failing
 let pollTimer: NodeJS.Timeout | undefined;
+let consecutive429s = 0;                // drives exponential backoff so repeated 429s don't retry at the same cadence
 
 function describeError(e: string | undefined): string {
   if (e === "HTTP 429") { return "rate limited"; }
@@ -74,8 +75,17 @@ async function poll(): Promise<void> {
   lastResult = result;
   if (result.ok) { lastGood = result; lastError = undefined; saveQuotaCache(result.quota); }
   else { lastError = result.error ?? result.reason; }
+
+  if (result.error === "HTTP 429") {
+    consecutive429s += 1;
+    const backoff = (result.retryAfterSeconds ?? REFRESH_INTERVAL_SECONDS) * 2 ** (consecutive429s - 1);
+    render();
+    schedule(Math.min(backoff, MAX_RATE_LIMIT_BACKOFF_SECONDS));
+    return;
+  }
+  consecutive429s = 0;
   render();
-  schedule(result.retryAfterSeconds ?? REFRESH_INTERVAL_SECONDS);
+  schedule(REFRESH_INTERVAL_SECONDS);
 }
 
 function schedule(delaySeconds: number): void {
