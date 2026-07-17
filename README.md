@@ -15,11 +15,15 @@ a popover with Claude, Codex, or both.
 - Shared two-minute poll cadence with independent in-flight and rate-limit state
 - Separate last-good caches so one provider's failure never hides the other
 - Live reset countdown or wall-clock reset time
+- Pace line marker on each bar, showing how much of the window has elapsed so
+  you can compare actual usage against an even burn rate (toggle on/off)
+- Light and dark theme that follows the macOS system appearance
 - Menu-bar-only macOS app with no dock icon
 
-Defaults are `Source: Both`, `Menu bar: Claude`, and `Reset time: Countdown`.
-When a single source is selected, the menu bar automatically follows that
-source. Returning to Both restores the last explicit menu-bar choice.
+Defaults are `Source: Both`, `Menu bar: Claude`, `Reset time: Countdown`, and
+`Pace line: On`. When a single source is selected, the menu bar automatically
+follows that source. Returning to Both restores the last explicit menu-bar
+choice.
 
 ## Requirements
 
@@ -61,7 +65,7 @@ pnpm start
 - `src/quota/claude/` reads Keychain credentials and Anthropic OAuth usage.
 - `src/quota/codex/` discovers Codex, manages app-server JSON-RPC, and maps
   account rate limits.
-- `src/preferences.ts` validates and persists source/menu/reset settings.
+- `src/preferences.ts` validates and persists source/menu/reset/pace-line settings.
 - `src/main.ts` composes Electron, providers, tray, popover, and IPC.
 
 Only successful normalized quota data is cached. Claude and Codex caches are
