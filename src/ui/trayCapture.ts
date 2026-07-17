@@ -22,7 +22,7 @@ const PAGE = `
   #row > * { display: inline-flex; align-items: center; }
   .grp { gap: 5px; }
   .logo { width: 15px; height: 15px; display: block; }
-  .label { opacity: 0.85; }
+  .label { opacity: 0.65; }
   .pct { font-variant-numeric: tabular-nums; }
   .track {
     display: inline-flex; width: 80px; height: 6px; border-radius: 3px;
@@ -48,11 +48,13 @@ const PAGE = `
     f.style.width = c + '%'; f.className = 'fill ' + cls(c); p.textContent = Math.round(c) + '%'; p.className = 'pct';
   }
   var logos = { claude: 'data:image/svg+xml;base64,${anthropicIcon}', codex: 'data:image/svg+xml;base64,${openaiIcon}' };
-  window.__render = function(provider, s, w, showSession, showWeekly, compactWeekly, dark, loading, unavailable){
-    document.documentElement.style.color = dark ? '#f2f2f2' : '#1c1c1e';
+  window.__render = function(provider, s, w, showSession, showWeekly, compactWeekly, loading, unavailable){
+    // Always render white: macOS doesn't expose the menu-bar backdrop luminance,
+    // and the menu bar is dark far more often than not (translucent over wallpaper).
+    document.documentElement.style.color = '#f2f2f2';
     var logo = document.getElementById('logo');
     logo.src = logos[provider];
-    logo.style.filter = provider === 'codex' && dark ? 'invert(1)' : 'none';
+    logo.style.filter = provider === 'codex' ? 'invert(1)' : 'none';
     var row = document.getElementById('row');
     var grp5 = document.getElementById('grp5'), grp7 = document.getElementById('grp7');
     var una = document.getElementById('unavailable'), ld = document.getElementById('loading');
@@ -92,13 +94,12 @@ const j = (v: number | null): string => (v === null ? "null" : String(v));
 
 export async function renderTray(
   display: TrayDisplayState,
-  dark: boolean,
 ): Promise<NativeImage> {
   await ensure();
   const wc = win!.webContents;
   const presentation = trayWindowPresentation(display);
   const width: number = await wc.executeJavaScript(
-    `window.__render(${JSON.stringify(display.provider)}, ${j(display.session)}, ${j(display.weekly)}, ${presentation.session}, ${presentation.weekly}, ${presentation.compactWeekly}, ${dark}, ${display.loading}, ${display.unavailable})`,
+    `window.__render(${JSON.stringify(display.provider)}, ${j(display.session)}, ${j(display.weekly)}, ${presentation.session}, ${presentation.weekly}, ${presentation.compactWeekly}, ${display.loading}, ${display.unavailable})`,
   );
   const w = Math.max(1, Math.min(320, width));
   win!.setContentSize(w, H);
