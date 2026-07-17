@@ -59,7 +59,7 @@ const WEEKLY_WINDOW_MINS = 7 * 24 * 60;
 function codexWindowDuration(value: unknown): number | null {
   if (!value || typeof value !== "object") { return null; }
   const duration = (value as Record<string, unknown>).windowDurationMins;
-  return typeof duration === "number" && duration > 0 ? duration : null;
+  return typeof duration === "number" && Number.isFinite(duration) && duration > 0 ? duration : null;
 }
 
 function assignCodexWindow(

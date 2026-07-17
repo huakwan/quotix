@@ -36,6 +36,32 @@ test("classifies Codex windows by reported duration", () => {
   assert.equal(dual.weekly.usedPct, 34);
 });
 
+test("falls back for malformed durations and preserves the first classified slot", () => {
+  const malformed = quotaFromCodexRateLimits({
+    rateLimits: {
+      primary: { usedPercent: 41, resetsAt: 300, windowDurationMins: Infinity },
+    },
+  }, 100);
+  assert.deepEqual(malformed.session, { usedPct: 41, resetsAt: 300 });
+  assert.equal(malformed.weekly, null);
+
+  const collision = quotaFromCodexRateLimits({
+    rateLimits: {
+      primary: { usedPercent: 51, resetsAt: 400, windowDurationMins: 10_080 },
+      secondary: { usedPercent: 52, resetsAt: 500, windowDurationMins: 20_160 },
+    },
+  }, 100);
+  assert.deepEqual(collision.weekly, { usedPct: 51, resetsAt: 400 });
+
+  const secondaryOnly = quotaFromCodexRateLimits({
+    rateLimits: {
+      secondary: { usedPercent: 61, resetsAt: 600, windowDurationMins: 300 },
+    },
+  }, 100);
+  assert.deepEqual(secondaryOnly.session, { usedPct: 61, resetsAt: 600 });
+  assert.equal(secondaryOnly.weekly, null);
+});
+
 test("provider maps success and disposes its client", async () => {
   let disposed = false;
   const client = { readRateLimits: async () => ({ rateLimits: { primary: { usedPercent: 10, resetsAt: 200 } } }), dispose: () => { disposed = true; } };
