@@ -8,7 +8,8 @@ a popover with Claude, Codex, or both.
 
 ## Features
 
-- Claude and Codex 5-hour/session and 7-day/weekly quota bars
+- Claude 5-hour/session and 7-day/weekly quota bars, plus the quota windows
+  currently reported by Codex
 - Popover source setting: `Claude`, `Codex`, or `Both`
 - Independent menu-bar source setting while `Both` is selected
 - Shared two-minute poll cadence with independent in-flight and rate-limit state
