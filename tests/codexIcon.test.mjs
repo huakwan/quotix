@@ -20,7 +20,7 @@ test("popover adapts only the Codex icon to the active appearance", () => {
   assert.match(html, /prefers-color-scheme:\s*light[\s\S]*\.codex-logo\s*\{[^}]*filter:\s*none/s);
 });
 
-test("tray inverts only the Codex icon in dark appearance", () => {
+test("tray inverts only the Codex icon", () => {
   const tray = readFileSync(join(root, "src/ui/trayCapture.ts"), "utf8");
-  assert.match(tray, /provider === 'codex' && dark \? 'invert\(1\)' : 'none'/);
+  assert.match(tray, /provider === 'codex' \? 'invert\(1\)' : 'none'/);
 });

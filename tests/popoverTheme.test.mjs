@@ -34,12 +34,12 @@ const semanticTokens = [
   "selected-shadow",
 ];
 
-test("popover window uses the native active popover material", () => {
+test("popover window uses the native active menu material", () => {
   const source = readFileSync(join(root, "src/ui/popoverWindow.ts"), "utf8");
 
-  assert.match(source, /vibrancy:\s*"popover"/);
+  assert.match(source, /vibrancy:\s*"menu"/);
   assert.match(source, /visualEffectState:\s*"active"/);
-  assert.doesNotMatch(source, /vibrancy:\s*"menu"/);
+  assert.doesNotMatch(source, /vibrancy:\s*"popover"/);
 });
 
 test("popover defines every semantic token for dark and light appearances", () => {
