@@ -18,7 +18,7 @@ export function createPopover(): BrowserWindow {
     skipTaskbar: true,
     alwaysOnTop: true,
     hasShadow: true,
-    vibrancy: "menu",
+    vibrancy: "popover",
     visualEffectState: "active",
     roundedCorners: true,
     webPreferences: {
