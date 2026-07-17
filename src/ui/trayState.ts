@@ -8,6 +8,13 @@ export interface TrayDisplayState {
   unavailable: boolean;
 }
 
+export function trayWindowVisibility(display: TrayDisplayState): {
+  session: boolean;
+  weekly: boolean;
+} {
+  return { session: display.session !== null, weekly: display.weekly !== null };
+}
+
 export function trayDisplayState(provider: ProviderId, state: SourceState): TrayDisplayState {
   const quota = state.lastGood ?? (state.result.ok ? state.result.quota : null);
   return {

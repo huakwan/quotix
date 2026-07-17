@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { trayDisplayState } from "../out/src/ui/trayState.js";
+import { trayDisplayState, trayWindowVisibility } from "../out/src/ui/trayState.js";
 
 const quota = {
   updatedAt: 100,
@@ -37,4 +37,14 @@ test("tray selector distinguishes loading and unavailable", () => {
     enabled: true, loading: false, result: { ok: false, reason: "missing" }, lastGood: null,
   });
   assert.equal(missing.unavailable, true);
+});
+
+test("tray visibility follows available normalized windows", () => {
+  assert.deepEqual(trayWindowVisibility({
+    provider: "codex",
+    session: null,
+    weekly: 31,
+    loading: false,
+    unavailable: false,
+  }), { session: false, weekly: true });
 });

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { sectionsForPayload, showMenuBarSetting } from "../out/src/ui/popoverState.js";
+import { availableQuotaRows, sectionsForPayload, showMenuBarSetting } from "../out/src/ui/popoverState.js";
 
 const missing = { enabled: false, loading: false, result: { ok: false, reason: "missing" }, lastGood: null };
 const quota = { updatedAt: 100, session: null, weekly: null, planDetected: false };
@@ -34,4 +34,16 @@ test("menu-bar setting is visible only for both", () => {
   assert.equal(showMenuBarSetting(payload("both").preferences), true);
   assert.equal(showMenuBarSetting(payload("claude").preferences), false);
   assert.equal(showMenuBarSetting(payload("codex").preferences), false);
+});
+
+test("quota rows include only available normalized windows", () => {
+  const weeklyOnly = {
+    updatedAt: 100,
+    session: null,
+    weekly: { usedPct: 31, resetsAt: 900 },
+    planDetected: true,
+  };
+  assert.deepEqual(availableQuotaRows(weeklyOnly).map((row) => row.label), ["7D"]);
+  const both = { ...weeklyOnly, session: { usedPct: 12, resetsAt: 200 } };
+  assert.deepEqual(availableQuotaRows(both).map((row) => row.label), ["5H", "7D"]);
 });

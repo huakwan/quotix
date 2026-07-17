@@ -1,10 +1,10 @@
 import anthropicIcon from "../../assets/anthropic.svg";
 import openaiIcon from "../../assets/openai.svg";
 import { BrowserWindow, NativeImage, nativeImage, screen } from "electron";
-import type { TrayDisplayState } from "./trayState";
+import { trayWindowVisibility, type TrayDisplayState } from "./trayState";
 
-// Renders the tray's inline row (5H [bar] % | 7D [bar] %) with the real system
-// font by laying it out in a hidden BrowserWindow and capturing it to a NativeImage.
+// Renders the tray's available inline quota rows with the real system font by
+// laying them out in a hidden BrowserWindow and capturing them to a NativeImage.
 // The tray runs in the main process with no DOM, and Tray only shows one image, so
 // text + bars must live in a single raster — captured here at the OS display scale.
 
@@ -47,7 +47,7 @@ const PAGE = `
     f.style.width = c + '%'; f.className = 'fill ' + cls(c); p.textContent = Math.round(c) + '%'; p.className = 'pct';
   }
   var logos = { claude: 'data:image/svg+xml;base64,${anthropicIcon}', codex: 'data:image/svg+xml;base64,${openaiIcon}' };
-  window.__render = function(provider, s, w, dark, loading, unavailable){
+  window.__render = function(provider, s, w, showSession, showWeekly, dark, loading, unavailable){
     document.documentElement.style.color = dark ? '#f2f2f2' : '#1c1c1e';
     var logo = document.getElementById('logo');
     logo.src = logos[provider];
@@ -61,8 +61,8 @@ const PAGE = `
     } else if (loading) {
       ld.style.display = 'inline-flex';
     } else {
-      grp5.style.display = 'inline-flex'; grp7.style.display = 'inline-flex';
-      seg('fs', 'ps', s); seg('fw', 'pw', w);
+      if (showSession) { grp5.style.display = 'inline-flex'; seg('fs', 'ps', s); }
+      if (showWeekly) { grp7.style.display = 'inline-flex'; seg('fw', 'pw', w); }
     }
     return Math.ceil(row.getBoundingClientRect().width);
   };
@@ -94,8 +94,9 @@ export async function renderTray(
 ): Promise<NativeImage> {
   await ensure();
   const wc = win!.webContents;
+  const visibility = trayWindowVisibility(display);
   const width: number = await wc.executeJavaScript(
-    `window.__render(${JSON.stringify(display.provider)}, ${j(display.session)}, ${j(display.weekly)}, ${dark}, ${display.loading}, ${display.unavailable})`,
+    `window.__render(${JSON.stringify(display.provider)}, ${j(display.session)}, ${j(display.weekly)}, ${visibility.session}, ${visibility.weekly}, ${dark}, ${display.loading}, ${display.unavailable})`,
   );
   const w = Math.max(1, Math.min(320, width));
   win!.setContentSize(w, H);

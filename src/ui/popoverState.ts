@@ -1,4 +1,4 @@
-import type { ProviderId, QuotaSnapshot, SourceState } from "../quota/model";
+import type { ProviderId, Quota, QuotaSnapshot, QuotaWindow, SourceState } from "../quota/model";
 import type { Preferences } from "../preferences";
 
 export interface PopoverPayload {
@@ -11,6 +11,18 @@ export interface PopoverSection {
   provider: ProviderId;
   name: string;
   state: SourceState;
+}
+
+export interface QuotaRow {
+  label: "5H" | "7D";
+  window: QuotaWindow;
+}
+
+export function availableQuotaRows(quota: Quota): QuotaRow[] {
+  const rows: QuotaRow[] = [];
+  if (quota.session) { rows.push({ label: "5H", window: quota.session }); }
+  if (quota.weekly) { rows.push({ label: "7D", window: quota.weekly }); }
+  return rows;
 }
 
 export function sectionsForPayload(payload: PopoverPayload): PopoverSection[] {
