@@ -50,7 +50,7 @@
       }
       .panel {
         background: transparent;
-        padding: 12px 14px;
+        padding: 20px 14px 12px 14px;
       }
       .header {
         display: flex;
@@ -116,6 +116,14 @@
         height: 1px;
         background: var(--track);
         margin: 10px 0;
+      }
+      .divider2 {
+        height: 1px;
+        background: var(--track);
+        margin: 16px 0;
+      }
+      .settings {
+        padding: 1px 0px 4px 0px;
       }
       .setting-row {
         display: flex;
@@ -234,21 +242,31 @@
   <body>
     <div class="panel">
       <div id="sources"></div>
-      <div class="divider" style="margin-top: 16px"></div>
+      <div class="divider2"></div>
       <div class="settings">
         <div class="setting-row">
           <span class="s-label">Source</span>
           <div class="segmented" id="source-mode">
-            <button class="seg-btn" data-value="claude" tabindex="-1">Claude</button>
-            <button class="seg-btn" data-value="codex" tabindex="-1">Codex</button>
-            <button class="seg-btn" data-value="both" tabindex="-1">Both</button>
+            <button class="seg-btn" data-value="claude" tabindex="-1">
+              Claude
+            </button>
+            <button class="seg-btn" data-value="codex" tabindex="-1">
+              Codex
+            </button>
+            <button class="seg-btn" data-value="both" tabindex="-1">
+              Both
+            </button>
           </div>
         </div>
         <div class="setting-row" id="menu-source-row">
           <span class="s-label">Menu bar</span>
           <div class="segmented" id="menu-source">
-            <button class="seg-btn" data-value="claude" tabindex="-1">Claude</button>
-            <button class="seg-btn" data-value="codex" tabindex="-1">Codex</button>
+            <button class="seg-btn" data-value="claude" tabindex="-1">
+              Claude
+            </button>
+            <button class="seg-btn" data-value="codex" tabindex="-1">
+              Codex
+            </button>
           </div>
         </div>
         <div class="setting-row">
@@ -267,33 +285,38 @@
       <div class="footer">
         <span class="version" id="version"></span>
         <div class="actions">
-          <button class="icon-btn" id="refresh" title="Refresh now" tabindex="-1">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
+          <button
+            class="icon-btn"
+            id="refresh"
+            title="Refresh now"
+            tabindex="-1"
           >
-            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-            <path d="M21 3v6h-6" />
-          </svg>
-        </button>
-        <button class="icon-btn" id="quit" title="Quit" tabindex="-1">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M12 3v9" />
-            <path d="M6.4 6.4a9 9 0 1 0 11.2 0" />
-          </svg>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+              <path d="M21 3v6h-6" />
+            </svg>
+          </button>
+          <button class="icon-btn" id="quit" title="Quit" tabindex="-1">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 3v9" />
+              <path d="M6.4 6.4a9 9 0 1 0 11.2 0" />
+            </svg>
           </button>
         </div>
       </div>

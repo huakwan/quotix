@@ -1,6 +1,6 @@
+import { quotaRowsForProvider, sectionsForPayload, showMenuBarSetting, type PopoverPayload } from "./popoverState";
 import type { DisplaySource, ProviderId, QuotaWindow, SourceState } from "../quota/model";
 import type { ResetMode } from "../preferences";
-import { quotaRowsForProvider, sectionsForPayload, showMenuBarSetting, type PopoverPayload } from "./popoverState";
 
 declare global {
   interface Window {
@@ -46,7 +46,7 @@ function clock(resetsAt: number | null, nowSec: number): string {
   const time = `${String(reset.getHours()).padStart(2, "0")}:${String(reset.getMinutes()).padStart(2, "0")}`;
   const sameDay = reset.getFullYear() === now.getFullYear()
     && reset.getMonth() === now.getMonth() && reset.getDate() === now.getDate();
-  return sameDay ? time : `${reset.getDate()}${MONTHS[reset.getMonth()]} ${time}`;
+  return sameDay ? time : `${reset.getDate()} ${MONTHS[reset.getMonth()]} ${time}`;
 }
 
 function resetText(resetsAt: number | null, nowSec: number, mode: ResetMode): string {
@@ -56,13 +56,13 @@ function resetText(resetsAt: number | null, nowSec: number, mode: ResetMode): st
 
 function updatedAgo(updatedAt: number, nowSec: number): string {
   const seconds = Math.max(0, nowSec - updatedAt);
-  if (seconds <= 5) { return "Updated just now"; }
-  if (seconds < 60) { return `Updated ${seconds} sec ago`; }
+  if (seconds <= 10) { return "updated just now"; }
+  if (seconds < 60) { return `updated ${seconds} sec ago`; }
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) { return `Updated ${minutes} min ago`; }
+  if (minutes < 60) { return `updated ${minutes} min ago`; }
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) { return `Updated ${hours} hour ago`; }
-  return `Updated ${Math.floor(hours / 24)} day ago`;
+  if (hours < 24) { return `updated ${hours} hour ago`; }
+  return `updated ${Math.floor(hours / 24)} day ago`;
 }
 
 function unavailableMessage(provider: ProviderId, state: SourceState): string {
@@ -79,7 +79,7 @@ function unavailableMessage(provider: ProviderId, state: SourceState): string {
 function rowHtml(label: string, window: QuotaWindow | null, nowSec: number, mode: ResetMode): string {
   if (!window) {
     return `<div class="item"><div class="row"><span class="label">${label}</span>`
-      + `<div class="track"></div><span class="pct">--%</span></div><div class="reset">--</div></div>`;
+      + `<div class="track"></div><span class="pct">0%</span></div><div class="reset">(not started)</div></div>`;
   }
   const pct = Math.round(window.usedPct);
   const width = Math.max(0, Math.min(100, window.usedPct));

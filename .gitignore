@@ -4,6 +4,7 @@ out/
 
 .superpowers/
 .worktrees/
+.pnpm-store/
 
 !CLAUDE.md
 !Makefile

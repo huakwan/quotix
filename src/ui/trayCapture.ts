@@ -1,7 +1,7 @@
+import { trayWindowPresentation, type TrayDisplayState } from "./trayState";
 import anthropicIcon from "../../assets/anthropic.svg";
 import openaiIcon from "../../assets/openai.svg";
 import { BrowserWindow, NativeImage, nativeImage, screen } from "electron";
-import { trayWindowPresentation, type TrayDisplayState } from "./trayState";
 
 // Renders the tray's available inline quota rows with the real system font by
 // laying them out in a hidden BrowserWindow and capturing them to a NativeImage.
@@ -22,14 +22,13 @@ const PAGE = `
   #row > * { display: inline-flex; align-items: center; }
   .grp { gap: 5px; }
   .logo { width: 15px; height: 15px; display: block; }
-  .label { opacity: 0.7; }
+  .label { opacity: 0.85; }
   .pct { font-variant-numeric: tabular-nums; }
   .track {
-    display: inline-flex; width: 60px; height: 6px; border-radius: 3px;
+    display: inline-flex; width: 80px; height: 6px; border-radius: 3px;
     background: rgba(140, 140, 145, 0.35); overflow: hidden;
   }
-  .grp.compact-weekly .label { display: none; }
-  .grp.compact-weekly .track { width: 90px; }
+  .grp.compact-weekly .track { width: 120px; }
   .fill { height: 100%; border-radius: 3px; width: 0%; }
   .green { background: #35c759; } .amber { background: #ffcc00; } .red { background: #ff453a; }
   #unavailable, #loading { display: none; }
@@ -42,7 +41,7 @@ const PAGE = `
   <span id="loading">Loading...</span>
 </div>
 <script>
-  function cls(p){ return p > 90 ? 'red' : p >= 70 ? 'amber' : 'green'; }
+  function cls(p){ return p > 90 ? 'red' : p >= 75 ? 'amber' : 'green'; }
   function seg(fillId, pctId, v){
     var f = document.getElementById(fillId), p = document.getElementById(pctId);
     var c = Math.max(0, Math.min(100, v === null ? 0 : v));

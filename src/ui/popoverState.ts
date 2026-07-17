@@ -37,7 +37,7 @@ export function sectionsForPayload(payload: PopoverPayload): PopoverSection[] {
     : [payload.preferences.source];
   return ids.map((provider) => ({
     provider,
-    name: provider === "claude" ? "Claude Code" : "Codex",
+    name: provider === "claude" ? "Claude Code" : "Codex OpenAI",
     state: payload.snapshot[provider],
   }));
 }
