@@ -8,24 +8,39 @@
     />
     <style>
       :root {
-        --fg: #f2f2f2;
-        --muted: #9a9a9e;
-        --track: rgba(255, 255, 255, 0.14);
+        --fg: rgba(255, 255, 255, 0.94);
+        --muted: rgba(255, 255, 255, 0.52);
+        --track: rgba(255, 255, 255, 0.18);
+        --separator: rgba(255, 255, 255, 0.16);
+        --control: rgba(255, 255, 255, 0.12);
+        --control-hover: rgba(255, 255, 255, 0.18);
+        --selected-control: rgba(255, 255, 255, 0.28);
+        --selected-border: rgba(0, 0, 0, 0.32);
+        --selected-shadow: rgba(0, 0, 0, 0.28);
         --green: #35c759;
         --amber: #ffcc00;
         --red: #ff453a;
-        --chip: rgba(255, 255, 255, 0.22);
       }
-      .codex-logo {
-        filter: invert(1);
-      }
+
       @media (prefers-color-scheme: light) {
         :root {
           --fg: #1c1c1e;
-          --muted: #6b6b70;
-          --track: rgba(0, 0, 0, 0.1);
-          --chip: #ffffff;
+          --muted: rgba(60, 60, 67, 0.60);
+          --track: rgba(60, 60, 67, 0.18);
+          --separator: rgba(60, 60, 67, 0.20);
+          --control: rgba(118, 118, 128, 0.12);
+          --control-hover: rgba(118, 118, 128, 0.18);
+          --selected-control: rgba(255, 255, 255, 0.72);
+          --selected-border: rgba(0, 0, 0, 0.12);
+          --selected-shadow: rgba(0, 0, 0, 0.18);
         }
+      }
+
+      .codex-logo {
+        filter: invert(1);
+      }
+
+      @media (prefers-color-scheme: light) {
         .codex-logo {
           filter: none;
         }
@@ -60,7 +75,7 @@
         margin-bottom: 10px;
       }
       .source-section + .source-section {
-        border-top: 1px solid var(--track);
+        border-top: 1px solid var(--separator);
         margin-top: 12px;
         padding-top: 12px;
       }
@@ -114,12 +129,12 @@
       }
       .divider {
         height: 1px;
-        background: var(--track);
+        background: var(--separator);
         margin: 10px 0;
       }
       .divider2 {
         height: 1px;
-        background: var(--track);
+        background: var(--separator);
         margin: 16px 0;
       }
       .settings {
@@ -140,7 +155,7 @@
         display: flex;
         padding: 2px;
         border-radius: 7px;
-        background: var(--track);
+        background: var(--control);
       }
       .seg-btn {
         border: 0;
@@ -159,15 +174,16 @@
           box-shadow 0.15s ease;
       }
       .seg-btn:hover:not(.active) {
+        background: var(--control-hover);
         color: var(--fg);
       }
       .seg-btn.active {
-        background: var(--chip);
+        background: var(--selected-control);
         color: var(--fg);
         font-weight: 600;
         box-shadow:
-          0 1px 2px rgba(0, 0, 0, 0.28),
-          0 0 0 0.5px rgba(0, 0, 0, 0.12);
+          0 1px 2px var(--selected-shadow),
+          0 0 0 0.5px var(--selected-border);
       }
       .seg-btn:focus {
         outline: none;
@@ -205,12 +221,12 @@
           background 0.12s,
           color 0.12s;
       }
-      .icon-btn:hover {
-        background: var(--track);
-        color: var(--fg);
-      }
+      .icon-btn:hover,
       .icon-btn:active {
-        background: var(--track);
+        background: var(--control-hover);
+      }
+      .icon-btn:hover {
+        color: var(--fg);
       }
       .icon-btn:focus {
         outline: none;
