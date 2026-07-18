@@ -136,7 +136,49 @@
         color: var(--muted);
         font-size: 11px;
         margin-top: 8px;
-        text-align: right;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 5px;
+      }
+      .info {
+        position: relative;
+        display: flex;
+        align-items: center;
+        color: var(--red);
+        cursor: default;
+      }
+      .info svg {
+        width: 13px;
+        height: 13px;
+        display: block;
+      }
+      .info .tooltip {
+        position: absolute;
+        bottom: calc(100% + 6px);
+        right: 0;
+        z-index: 10;
+        width: max-content;
+        max-width: 200px;
+        padding: 6px 8px;
+        border-radius: 6px;
+        background: rgba(30, 30, 32, 0.98);
+        color: rgba(255, 255, 255, 0.94);
+        font-size: 10px;
+        line-height: 1.35;
+        text-align: left;
+        white-space: normal;
+        word-break: break-word;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+        opacity: 0;
+        visibility: hidden;
+        transition:
+          opacity 0.12s ease,
+          visibility 0.12s ease;
+      }
+      .info:hover .tooltip {
+        opacity: 1;
+        visibility: visible;
       }
       .divider {
         height: 1px;

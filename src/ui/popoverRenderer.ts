@@ -55,6 +55,29 @@ function resetText(resetsAt: number | null, nowSec: number, mode: ResetMode): st
   return mode === "clock" ? `reset at ${clock(resetsAt, nowSec)}` : `reset in ${countdown(resetsAt, nowSec)}`;
 }
 
+const STALE_SECONDS = 10 * 60;
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+const INFO_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" `
+  + `stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">`
+  + `<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>`;
+
+function updatedLine(quota: { updatedAt: number }, state: SourceState, nowSec: number): string {
+  const text = updatedAgo(quota.updatedAt, nowSec);
+  const stale = nowSec - quota.updatedAt > STALE_SECONDS;
+  const error = state.result.ok ? state.result.diagnostic : undefined;
+  if (!stale || !error) { return `<div class="updated">${text}</div>`; }
+  return `<div class="updated"><span class="info" tabindex="-1">${INFO_ICON}`
+    + `<span class="tooltip">${escapeHtml(error)}</span></span>${text}</div>`;
+}
+
 function updatedAgo(updatedAt: number, nowSec: number): string {
   const seconds = Math.max(0, nowSec - updatedAt);
   if (seconds <= 10) { return "updated just now"; }
@@ -114,7 +137,7 @@ function sectionHtml(provider: ProviderId, name: string, state: SourceState, pay
     ? quotaRowsForProvider(provider, quota)
       .map((row) => rowHtml(row.label, row.window, payload.nowSec, payload.preferences.resetMode, payload.preferences.showPaceLine))
       .join("")
-      + `<div class="updated">${updatedAgo(quota.updatedAt, payload.nowSec)}</div>`
+      + updatedLine(quota, state, payload.nowSec)
     : `<div class="unavailable">${unavailableMessage(provider, state)}</div>`;
   return `<section class="source-section"><div class="header"><img class="${provider === "codex" ? "logo codex-logo" : "logo"}" src="${logo}" alt=""/>`
     + `<span>${name}</span></div>${body}</section>`;
