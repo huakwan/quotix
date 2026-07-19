@@ -7,6 +7,10 @@ const quota = {
   updatedAt: 123,
   session: { usedPct: 10, resetsAt: 456 },
   weekly: { usedPct: 20, resetsAt: null },
+  weeklyModels: [
+    { model: "Fable", window: { usedPct: 5, resetsAt: 999 } },
+    { model: "Inactive", window: null },
+  ],
   planDetected: true,
 };
 

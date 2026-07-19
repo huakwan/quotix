@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { ProviderId, Quota, QuotaWindow } from "./model";
+import type { ProviderId, Quota, QuotaWindow, WeeklyModelQuota } from "./model";
 
 export interface QuotaCache {
   readonly path: string;
@@ -29,6 +29,17 @@ function normWindow(value: unknown): QuotaWindow | null {
   return { usedPct: window.usedPct, resetsAt: window.resetsAt };
 }
 
+function normWeeklyModels(value: unknown): WeeklyModelQuota[] {
+  if (value === undefined) { return []; }
+  if (!Array.isArray(value)) { throw new Error("invalid weekly models"); }
+  return value.map((entry) => {
+    if (!entry || typeof entry !== "object") { throw new Error("invalid weekly model entry"); }
+    const e = entry as Record<string, unknown>;
+    if (typeof e.model !== "string") { throw new Error("invalid weekly model name"); }
+    return { model: e.model, window: normWindow(e.window) };
+  });
+}
+
 function parseQuota(raw: string): Quota {
   const value = JSON.parse(raw) as Record<string, unknown>;
   if (typeof value.updatedAt !== "number") { throw new Error("invalid timestamp"); }
@@ -36,6 +47,7 @@ function parseQuota(raw: string): Quota {
     updatedAt: value.updatedAt,
     session: normWindow(value.session),
     weekly: normWindow(value.weekly),
+    weeklyModels: normWeeklyModels(value.weeklyModels),
     planDetected: value.planDetected === true,
   };
 }

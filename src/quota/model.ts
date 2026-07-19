@@ -3,10 +3,16 @@ export interface QuotaWindow {
   resetsAt: number | null;
 }
 
+export interface WeeklyModelQuota {
+  model: string;
+  window: QuotaWindow | null;
+}
+
 export interface Quota {
   updatedAt: number;
   session: QuotaWindow | null;
   weekly: QuotaWindow | null;
+  weeklyModels: WeeklyModelQuota[];
   planDetected: boolean;
 }
 
@@ -34,6 +40,25 @@ function toOAuthWindow(w: unknown): QuotaWindow | null {
   return { usedPct: o.utilization, resetsAt };
 }
 
+function parseWeeklyModelLimits(limits: unknown): WeeklyModelQuota[] {
+  if (!Array.isArray(limits)) { return []; }
+  const result: WeeklyModelQuota[] = [];
+  for (const entry of limits) {
+    if (!entry || typeof entry !== "object") { continue; }
+    const l = entry as Record<string, unknown>;
+    if (l.group !== "weekly" || l.kind !== "weekly_scoped") { continue; }
+    const scope = l.scope as Record<string, unknown> | null | undefined;
+    const model = scope?.model as Record<string, unknown> | null | undefined;
+    const name = typeof model?.display_name === "string" ? model.display_name : null;
+    if (!name) { continue; }
+    const window = typeof l.percent === "number" && typeof l.resets_at === "string"
+      ? { usedPct: l.percent, resetsAt: Math.floor(new Date(l.resets_at).getTime() / 1000) }
+      : null;
+    result.push({ model: name, window });
+  }
+  return result;
+}
+
 export function quotaFromOAuthUsage(usage: unknown, updatedAt: number): Quota {
   const o = (usage ?? {}) as Record<string, unknown>;
   const session = toOAuthWindow(o.five_hour);
@@ -42,6 +67,7 @@ export function quotaFromOAuthUsage(usage: unknown, updatedAt: number): Quota {
     updatedAt,
     session,
     weekly,
+    weeklyModels: parseWeeklyModelLimits(o.limits),
     planDetected: session !== null || weekly !== null,
   };
 }
@@ -92,6 +118,7 @@ export function quotaFromCodexRateLimits(response: unknown, updatedAt: number): 
   return {
     updatedAt,
     ...slots,
+    weeklyModels: [],
     planDetected: slots.session !== null || slots.weekly !== null,
   };
 }

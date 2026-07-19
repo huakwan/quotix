@@ -52,3 +52,30 @@ test("quota rows keep both Claude windows but filter missing Codex windows", () 
     ["7D"],
   );
 });
+
+test("active per-model weekly quotas append extra rows", () => {
+  const withFable = {
+    updatedAt: 100,
+    session: { usedPct: 12, resetsAt: 200 },
+    weekly: { usedPct: 34, resetsAt: 400 },
+    weeklyModels: [{ model: "Fable", window: { usedPct: 5, resetsAt: 400 } }],
+    planDetected: true,
+  };
+  const rows = quotaRowsForProvider("claude", withFable);
+  assert.deepEqual(rows.map((row) => row.label), ["5H", "7D", "FA"]);
+  assert.deepEqual(rows[2].window, { usedPct: 5, resetsAt: 400 });
+  assert.equal(rows[2].periodSeconds, 7 * 24 * 3600);
+});
+
+test("inactive per-model weekly quota still appends a row with a null window", () => {
+  const inactive = {
+    updatedAt: 100,
+    session: { usedPct: 12, resetsAt: 200 },
+    weekly: { usedPct: 34, resetsAt: 400 },
+    weeklyModels: [{ model: "Fable", window: null }],
+    planDetected: true,
+  };
+  const rows = quotaRowsForProvider("claude", inactive);
+  assert.deepEqual(rows.map((row) => row.label), ["5H", "7D", "FA"]);
+  assert.equal(rows[2].window, null);
+});

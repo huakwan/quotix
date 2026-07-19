@@ -100,32 +100,33 @@ function unavailableMessage(provider: ProviderId, state: SourceState): string {
   return "Quota data unavailable. Retrying automatically…";
 }
 
-const WINDOW_SECONDS: Record<string, number> = {
-  "5H": 5 * 3600,
-  "7D": 7 * 24 * 3600,
-};
-
 // Marker showing where usage "should" be at the current point in the window,
 // i.e. the fraction of the window that has elapsed (paced usage line).
-function guideHtml(label: string, resetsAt: number | null, nowSec: number, show: boolean): string {
-  if (!show) { return ""; }
-  const duration = WINDOW_SECONDS[label];
-  if (!duration || resetsAt === null) { return ""; }
+function guideHtml(periodSeconds: number, resetsAt: number | null, nowSec: number, show: boolean): string {
+  if (!show || !periodSeconds || resetsAt === null) { return ""; }
   const remaining = resetsAt - nowSec;
-  const elapsedPct = Math.max(0, Math.min(100, ((duration - remaining) / duration) * 100));
+  const elapsedPct = Math.max(0, Math.min(100, ((periodSeconds - remaining) / periodSeconds) * 100));
   return `<div class="guide" style="left:${elapsedPct}%"></div>`;
 }
 
-function rowHtml(label: string, window: QuotaWindow | null, nowSec: number, mode: ResetMode, showPaceLine: boolean): string {
+function rowHtml(
+  label: string,
+  window: QuotaWindow | null,
+  periodSeconds: number,
+  nowSec: number,
+  mode: ResetMode,
+  showPaceLine: boolean,
+): string {
+  const escapedLabel = escapeHtml(label);
   if (!window) {
-    return `<div class="item"><div class="row"><span class="label">${label}</span>`
+    return `<div class="item"><div class="row"><span class="label">${escapedLabel}</span>`
       + `<div class="track"></div><span class="pct">0%</span></div><div class="reset">(not started)</div></div>`;
   }
   const pct = Math.round(window.usedPct);
   const width = Math.max(0, Math.min(100, window.usedPct));
-  return `<div class="item"><div class="row"><span class="label">${label}</span>`
+  return `<div class="item"><div class="row"><span class="label">${escapedLabel}</span>`
     + `<div class="track"><div class="fill ${colorClass(pct)}" style="width:${width}%"></div>`
-    + `${guideHtml(label, window.resetsAt, nowSec, showPaceLine)}</div>`
+    + `${guideHtml(periodSeconds, window.resetsAt, nowSec, showPaceLine)}</div>`
     + `<span class="pct">${pct}%</span></div>`
     + `<div class="reset">${resetText(window.resetsAt, nowSec, mode)}</div></div>`;
 }
@@ -135,7 +136,9 @@ function sectionHtml(provider: ProviderId, name: string, state: SourceState, pay
   const quota = state.lastGood ?? (state.result.ok ? state.result.quota : null);
   const body = quota
     ? quotaRowsForProvider(provider, quota)
-      .map((row) => rowHtml(row.label, row.window, payload.nowSec, payload.preferences.resetMode, payload.preferences.showPaceLine))
+      .map((row) => rowHtml(
+        row.label, row.window, row.periodSeconds, payload.nowSec, payload.preferences.resetMode, payload.preferences.showPaceLine,
+      ))
       .join("")
       + updatedLine(quota, state, payload.nowSec)
     : `<div class="unavailable">${unavailableMessage(provider, state)}</div>`;
