@@ -129,31 +129,23 @@ test("manual releases derive their tag and app archives from package.json", () =
     "Thai section should restrict commands to apps from the official release",
   );
 
-  const ghApiCommands = workflow.match(/gh api\b(?:\\\n|[^\n])*/g) ?? [];
-  const normalizedGhApiCommands = ghApiCommands.map((command) =>
-    command.replace(/\\\n[ \t]*/g, " "),
+  const releaseCreationMatch = workflow.match(
+    /(release_id="\$\(gh api --method POST "repos\/\$\{GH_REPO\}\/releases" \\\n[\s\S]*?\n\s+--jq '\.id'\)")/,
   );
-  const postMethod = /(?:^|\s)(?:--method(?:=|\s+)POST|-X\s+POST)(?=\s|$)/;
-  const releasesEndpoint =
-    /(?:^|\s)(?:"repos\/\$\{GH_REPO\}\/releases"|'repos\/\$\{GH_REPO\}\/releases'|repos\/\$\{GH_REPO\}\/releases)(?=\s|$)/;
-  const releaseCreationCommands = normalizedGhApiCommands.filter(
-    (command) => postMethod.test(command) && releasesEndpoint.test(command),
+  assert.ok(
+    releaseCreationMatch,
+    "release_id assignment should contain the releases POST through its jq result",
   );
-  assert.equal(
-    releaseCreationCommands.length,
-    1,
-    "workflow should contain exactly one POST to the releases endpoint",
-  );
-  const releaseCreationCommand = releaseCreationCommands[0];
+  const releaseCreationAssignment = releaseCreationMatch[1];
   assert.match(
-    releaseCreationCommand,
+    releaseCreationAssignment,
     /-F body=@release-body\.md/,
-    "release-creation POST should use release-body.md",
+    "release_id assignment should use release-body.md",
   );
   assert.match(
-    releaseCreationCommand,
+    releaseCreationAssignment,
     /-F generate_release_notes=true/,
-    "release-creation POST should retain generated release notes",
+    "release_id assignment should retain generated release notes",
   );
   assert.match(workflow, /gh release upload/);
   assert.match(workflow, /GH_REPO: \$\{\{ github\.repository \}\}/);
