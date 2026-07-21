@@ -38,3 +38,10 @@ backoff. Manual refresh does not bypass active backoff.
 
 Never log or persist OAuth tokens, Keychain output, Codex credentials, or raw
 app-server payloads. Cache only normalized quota fields.
+
+## User workflow preference
+
+For small, clearly scoped edits, implement the change directly without using
+Superpowers workflows or writing design and implementation plan documents.
+Use the full Superpowers workflow only for larger work that affects multiple
+files, creates several files, or requires significant design or coordination.
