@@ -11,7 +11,7 @@
     "test": "pnpm run test:unit",
     "watch": "node esbuild.js --watch",
     "start": "npm run compile && electron .",
-    "dist:mac": "npm run compile && electron-builder --mac --dir"
+    "dist:mac": "npm run compile && electron-builder --mac --universal --dir"
   },
   "build": {
     "appId": "com.huakwan.quotix",
@@ -53,6 +53,10 @@
       "icon": "assets/icon.icns",
       "target": "dir",
       "category": "public.app-category.utilities",
+      "minimumSystemVersion": "12.0",
+      "identity": "-",
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
       "extendInfo": {
         "LSUIElement": true
       }
