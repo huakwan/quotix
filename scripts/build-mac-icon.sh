@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE="$ROOT_DIR/assets/icon.svg"
 OUTPUT="$ROOT_DIR/assets/icon.icns"
 
-for tool in /usr/bin/qlmanage /usr/bin/sips /usr/bin/iconutil; do
+for tool in "$ROOT_DIR/node_modules/.bin/electron" /usr/bin/sips /usr/bin/iconutil; do
   [[ -x "$tool" ]] || { echo "missing required tool: $tool" >&2; exit 1; }
 done
 [[ -s "$SOURCE" ]] || { echo "missing icon source: $SOURCE" >&2; exit 1; }
@@ -15,8 +15,8 @@ trap 'rm -rf "$WORK_DIR"' EXIT
 ICONSET="$WORK_DIR/icon.iconset"
 mkdir -p "$ICONSET"
 
-/usr/bin/qlmanage -t -s 1024 -o "$WORK_DIR" "$SOURCE" >/dev/null
-MASTER="$WORK_DIR/icon.svg.png"
+MASTER="$WORK_DIR/icon.png"
+env -u ELECTRON_RUN_AS_NODE "$ROOT_DIR/node_modules/.bin/electron" "$ROOT_DIR/scripts/rasterize-mac-icon.cjs" "$SOURCE" "$MASTER"
 [[ -s "$MASTER" ]] || { echo "failed to rasterize $SOURCE" >&2; exit 1; }
 
 make_png() {

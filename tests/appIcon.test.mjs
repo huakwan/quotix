@@ -5,8 +5,25 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { inflateSync } from "node:zlib";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+function readTopLeftAlpha(pngPath) {
+  const png = readFileSync(pngPath);
+  assert.equal(png.readUInt32BE(24), 0x08060000, "expected an 8-bit RGBA PNG");
+
+  const idat = [];
+  for (let offset = 8; offset < png.length;) {
+    const length = png.readUInt32BE(offset);
+    const type = png.toString("ascii", offset + 4, offset + 8);
+    if (type === "IDAT") idat.push(png.subarray(offset + 8, offset + 8 + length));
+    offset += length + 12;
+  }
+
+  const scanlines = inflateSync(Buffer.concat(idat));
+  return scanlines[4];
+}
 
 test("ships editable and packaged macOS icon assets", () => {
   assert.equal(existsSync(join(root, "assets/icon.svg")), true);
@@ -24,6 +41,21 @@ test("icns contains every standard macOS icon representation", () => {
       "icon_128x128.png", "icon_128x128@2x.png", "icon_256x256.png", "icon_256x256@2x.png",
       "icon_512x512.png", "icon_512x512@2x.png",
     ]) assert.equal(existsSync(join(iconset, name)), true, `missing ${name}`);
+  } finally {
+    rmSync(output, { recursive: true, force: true });
+  }
+});
+
+test("every macOS icon representation keeps its canvas transparent", () => {
+  const output = mkdtempSync(join(tmpdir(), "quotix-icon-alpha-"));
+  const iconset = join(output, "icon.iconset");
+  try {
+    execFileSync("/usr/bin/iconutil", ["-c", "iconset", join(root, "assets/icon.icns"), "-o", iconset]);
+    for (const name of [
+      "icon_16x16.png", "icon_16x16@2x.png", "icon_32x32.png", "icon_32x32@2x.png",
+      "icon_128x128.png", "icon_128x128@2x.png", "icon_256x256.png", "icon_256x256@2x.png",
+      "icon_512x512.png", "icon_512x512@2x.png",
+    ]) assert.equal(readTopLeftAlpha(join(iconset, name)), 0, `${name} has an opaque canvas`);
   } finally {
     rmSync(output, { recursive: true, force: true });
   }
