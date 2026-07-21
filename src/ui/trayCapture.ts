@@ -42,13 +42,14 @@ const j = (v: number | null): string => (v === null ? "null" : String(v));
 export async function renderTray(
   display: TrayDisplayState,
   showPaceLine: boolean,
+  dark: boolean,
 ): Promise<NativeImage> {
   await ensure();
   const wc = win!.webContents;
   const presentation = trayWindowPresentation(display);
   const nowSec = Math.floor(Date.now() / 1000);
   const width: number = await wc.executeJavaScript(
-    `window.__render(${JSON.stringify(display.provider)}, ${j(display.session)}, ${j(display.weekly)}, ${j(display.sessionResetsAt)}, ${j(display.weeklyResetsAt)}, ${nowSec}, ${showPaceLine}, ${presentation.session}, ${presentation.weekly}, ${presentation.compactWeekly}, ${display.loading}, ${display.unavailable})`,
+    `window.__render(${JSON.stringify(display.provider)}, ${j(display.session)}, ${j(display.weekly)}, ${j(display.sessionResetsAt)}, ${j(display.weeklyResetsAt)}, ${nowSec}, ${showPaceLine}, ${presentation.session}, ${presentation.weekly}, ${presentation.compactWeekly}, ${dark}, ${display.loading}, ${display.unavailable})`,
   );
   const w = Math.max(1, Math.min(320, width));
   win!.setContentSize(w, H);

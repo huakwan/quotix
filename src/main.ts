@@ -48,7 +48,11 @@ function render(): void {
 
 async function updateTray(provider: ProviderId, snapshot: QuotaSnapshot): Promise<void> {
   try {
-    const image = await renderTray(trayDisplayState(provider, snapshot[provider]), preferences.showPaceLine);
+    const image = await renderTray(
+      trayDisplayState(provider, snapshot[provider]),
+      preferences.showPaceLine,
+      nativeTheme.shouldUseDarkColors,
+    );
     tray?.setImage(image);
   } catch {
     /* retain the last tray image if capture fails */

@@ -20,7 +20,14 @@ test("popover adapts only the Codex icon to the active appearance", () => {
   assert.match(html, /prefers-color-scheme:\s*light[\s\S]*\.codex-logo\s*\{[^}]*filter:\s*none/s);
 });
 
-test("tray inverts only the Codex icon", () => {
+test("tray follows the active macOS appearance", () => {
+  const main = readFileSync(join(root, "src/main.ts"), "utf8");
   const tray = readFileSync(join(root, "src/ui/trayCapture.html"), "utf8");
-  assert.match(tray, /provider === "codex" \? "invert\(1\)" : "none"/);
+
+  assert.match(
+    main,
+    /renderTray\([\s\S]*preferences\.showPaceLine,[\s\S]*nativeTheme\.shouldUseDarkColors,[\s\S]*\)/,
+  );
+  assert.match(tray, /document\.documentElement\.style\.color = dark \? "#f2f2f2" : "#1c1c1e"/);
+  assert.match(tray, /provider === "codex" && dark \? "invert\(1\)" : "none"/);
 });

@@ -150,15 +150,14 @@
         showSession,
         showWeekly,
         compactWeekly,
+        dark,
         loading,
         unavailable,
       ) {
-        // Always render white: macOS doesn't expose the menu-bar backdrop luminance,
-        // and the menu bar is dark far more often than not (translucent over wallpaper).
-        document.documentElement.style.color = "#f2f2f2";
+        document.documentElement.style.color = dark ? "#f2f2f2" : "#1c1c1e";
         var logo = document.getElementById("logo");
         logo.src = logos[provider];
-        logo.style.filter = provider === "codex" ? "invert(1)" : "none";
+        logo.style.filter = provider === "codex" && dark ? "invert(1)" : "none";
         var row = document.getElementById("row");
         var grp5 = document.getElementById("grp5"),
           grp7 = document.getElementById("grp7");
