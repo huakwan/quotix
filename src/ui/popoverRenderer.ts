@@ -23,7 +23,7 @@ let last: PopoverPayload | null = null;
 
 function colorClass(pct: number): "green" | "amber" | "red" {
   if (pct > 90) { return "red"; }
-  if (pct >= 70) { return "amber"; }
+  if (pct >= 75) { return "amber"; }
   return "green";
 }
 
@@ -33,8 +33,8 @@ function countdown(resetsAt: number | null, nowSec: number): string {
   const days = Math.floor(seconds / 86400); seconds -= days * 86400;
   const hours = Math.floor(seconds / 3600); seconds -= hours * 3600;
   const minutes = Math.floor(seconds / 60);
-  if (days > 0) { return `${days}d${hours}h`; }
-  if (hours > 0) { return `${hours}h${minutes}m`; }
+  if (days > 0) { return `${days}d ${hours}h`; }
+  if (hours > 0) { return `${hours}h ${minutes}m`; }
   return `${minutes}m`;
 }
 

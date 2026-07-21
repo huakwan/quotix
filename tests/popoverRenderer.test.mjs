@@ -15,6 +15,25 @@ function loadUpdatedAgo() {
   return runInNewContext(`(${javascript})`);
 }
 
+function loadColorClass() {
+  const renderer = readFileSync(join(root, "src/ui/popoverRenderer.ts"), "utf8");
+  const source = renderer.match(/function colorClass[\s\S]*?\n}/)?.[0];
+  assert.ok(source, "colorClass function should exist");
+  const javascript = source
+    .replace(/\(pct: number\)/, "(pct)")
+    .replace(/:\s*"green"\s*\|\s*"amber"\s*\|\s*"red"/, "");
+  return runInNewContext(`(${javascript})`);
+}
+
+test("popover quota bar turns amber at 75 percent", () => {
+  const colorClass = loadColorClass();
+
+  assert.equal(colorClass(74), "green");
+  assert.equal(colorClass(75), "amber");
+  assert.equal(colorClass(90), "amber");
+  assert.equal(colorClass(91), "red");
+});
+
 test("updated age uses seconds only after ten seconds and before one minute", () => {
   const updatedAgo = loadUpdatedAgo();
 

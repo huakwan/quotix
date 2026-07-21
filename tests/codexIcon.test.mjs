@@ -31,3 +31,32 @@ test("tray follows the active macOS appearance", () => {
   assert.match(tray, /document\.documentElement\.style\.color = dark \? "#f2f2f2" : "#1c1c1e"/);
   assert.match(tray, /provider === "codex" && dark \? "invert\(1\)" : "none"/);
 });
+
+test("tray provides explicit 1x and 2x canvas image representations", () => {
+  const source = readFileSync(join(root, "src/ui/trayCapture.ts"), "utf8");
+
+  assert.match(source, /window\.__renderCanvas/);
+  assert.match(source, /addRepresentation\(\{\s*scaleFactor:\s*1/);
+  assert.match(source, /addRepresentation\(\{\s*scaleFactor:\s*2/);
+  assert.doesNotMatch(source, /screen\.getPrimaryDisplay\(\)\.scaleFactor/);
+});
+
+test("tray forces a single 1x image on macOS 12 and serializes canvas rendering", () => {
+  const source = readFileSync(join(root, "src/ui/trayCapture.ts"), "utf8");
+
+  assert.match(
+    source,
+    /process\.getSystemVersion\(\)\.startsWith\("12\."\)[\s\S]*createFromDataURL\(rendered\.oneX\)/,
+  );
+  assert.match(source, /renderQueue\.then\(\(\) => drawTray/);
+  assert.match(source, /renderQueue = drawing\.then/);
+});
+
+test("tray renders through canvas instead of capturing a hidden GPU surface", () => {
+  const source = readFileSync(join(root, "src/ui/trayCapture.ts"), "utf8");
+  const html = readFileSync(join(root, "src/ui/trayCapture.html"), "utf8");
+
+  assert.match(html, /canvas\.toDataURL\("image\/png"\)/);
+  assert.match(html, /oneX:\s*paint\(1\),\s*twoX:\s*paint\(2\)/);
+  assert.doesNotMatch(source, /capturePage\(/);
+});

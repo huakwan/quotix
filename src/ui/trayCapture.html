@@ -186,6 +186,142 @@
         }
         return Math.ceil(row.getBoundingClientRect().width);
       };
+
+      function roundedRect(ctx, x, y, width, height, radius) {
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height - radius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        ctx.lineTo(x + radius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+      }
+
+      function fillRoundedRect(ctx, x, y, width, height, radius, color) {
+        if (width <= 0 || height <= 0) return;
+        roundedRect(ctx, x, y, width, height, Math.min(radius, width / 2, height / 2));
+        ctx.fillStyle = color;
+        ctx.fill();
+      }
+
+      var canvasLogos = {
+        claude: new Image(),
+        codex: new Image(),
+      };
+      canvasLogos.claude.src = logos.claude;
+      canvasLogos.codex.src = logos.codex;
+
+      async function readyImage(image) {
+        if (image.complete) return;
+        try {
+          await Promise.race([
+            image.decode(),
+            new Promise(function (resolve) { setTimeout(resolve, 100); }),
+          ]);
+        } catch (_) { /* draw without a logo */ }
+      }
+
+      // Draw the same tray presentation into an isolated canvas. Reading the
+      // canvas PNG avoids BrowserWindow.capturePage(), whose transparent output
+      // is corrupted by Chromium's compositor on Intel Macs running macOS 12.
+      window.__renderCanvas = async function (
+        provider,
+        s,
+        w,
+        sReset,
+        wReset,
+        nowSec,
+        showPaceLine,
+        showSession,
+        showWeekly,
+        compactWeekly,
+        dark,
+        loading,
+        unavailable,
+      ) {
+        var font = "500 13px -apple-system, system-ui, sans-serif";
+        var measureCanvas = document.createElement("canvas");
+        var measure = measureCanvas.getContext("2d");
+        measure.font = font;
+
+        var groups = [];
+        if (!loading && !unavailable) {
+          if (showSession) groups.push({ label: "5H", value: s, reset: sReset, duration: __SESSION_DUR__, track: 60 });
+          if (showWeekly) groups.push({ label: "7D", value: w, reset: wReset, duration: __WEEKLY_DUR__, track: compactWeekly ? 120 : 60 });
+        }
+        groups.forEach(function (group) {
+          group.percent = Math.round(Math.max(0, Math.min(100, group.value === null ? 0 : group.value))) + "%";
+          group.labelWidth = Math.ceil(measure.measureText(group.label).width);
+          group.percentWidth = Math.ceil(measure.measureText(group.percent).width);
+          group.width = group.labelWidth + 5 + group.track + 5 + group.percentWidth;
+        });
+
+        var status = unavailable ? "Unavailable" : loading ? "Loading..." : "";
+        var contentWidth = status
+          ? Math.ceil(measure.measureText(status).width)
+          : groups.reduce(function (sum, group) { return sum + group.width; }, 0) + Math.max(0, groups.length - 1) * 9;
+        var width = Math.ceil(3 + 15 + 9 + contentWidth + 3);
+        await readyImage(canvasLogos[provider]);
+
+        function paint(scale) {
+          var canvas = document.createElement("canvas");
+          canvas.width = width * scale;
+          canvas.height = __H__ * scale;
+          var ctx = canvas.getContext("2d");
+          ctx.scale(scale, scale);
+          ctx.clearRect(0, 0, width, __H__);
+          ctx.font = font;
+          ctx.textBaseline = "middle";
+          ctx.imageSmoothingEnabled = true;
+
+          var foreground = dark ? "#f2f2f2" : "#1c1c1e";
+          var logo = canvasLogos[provider];
+          if (logo.complete && logo.naturalWidth > 0) {
+            ctx.save();
+            ctx.filter = provider === "codex" && dark ? "invert(1)" : "none";
+            ctx.drawImage(logo, 3, (__H__ - 15) / 2, 15, 15);
+            ctx.restore();
+          }
+
+          var x = 27;
+          if (status) {
+            ctx.fillStyle = foreground;
+            ctx.fillText(status, x, __H__ / 2);
+          } else {
+            groups.forEach(function (group, index) {
+              if (index > 0) x += 9;
+              ctx.save();
+              ctx.globalAlpha = 0.65;
+              ctx.fillStyle = foreground;
+              ctx.fillText(group.label, x, __H__ / 2);
+              ctx.restore();
+              x += group.labelWidth + 5;
+
+              var trackX = x;
+              fillRoundedRect(ctx, trackX, 8, group.track, 6, 3, "rgba(140, 140, 145, 0.35)");
+              var value = Math.max(0, Math.min(100, group.value === null ? 0 : group.value));
+              var color = value > 90 ? "#ff453a" : value >= 75 ? "#ffcc00" : "#35c759";
+              fillRoundedRect(ctx, trackX, 8, group.track * value / 100, 6, 3, color);
+              if (showPaceLine && group.reset !== null) {
+                var elapsed = Math.max(0, Math.min(100, ((group.duration - (group.reset - nowSec)) / group.duration) * 100));
+                var guideX = trackX + group.track * elapsed / 100;
+                fillRoundedRect(ctx, guideX - 1, 6.75, 2, 8.5, 1, "rgba(255, 140, 57, 0.8)");
+              }
+              x += group.track + 5;
+              ctx.fillStyle = foreground;
+              ctx.fillText(group.percent, x, __H__ / 2);
+              x += group.percentWidth;
+            });
+          }
+          return canvas.toDataURL("image/png");
+        }
+
+        return { width: width, oneX: paint(1), twoX: paint(2) };
+      };
     </script>
   </body>
 </html>
