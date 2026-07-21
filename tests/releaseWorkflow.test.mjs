@@ -130,10 +130,14 @@ test("manual releases derive their tag and app archives from package.json", () =
   );
 
   const ghApiCommands = workflow.match(/gh api\b(?:\\\n|[^\n])*/g) ?? [];
-  const releaseCreationCommands = ghApiCommands.filter(
-    (command) =>
-      command.includes("--method POST") &&
-      command.includes('"repos/${GH_REPO}/releases"'),
+  const normalizedGhApiCommands = ghApiCommands.map((command) =>
+    command.replace(/\\\n[ \t]*/g, " "),
+  );
+  const postMethod = /(?:^|\s)(?:--method(?:=|\s+)POST|-X\s+POST)(?=\s|$)/;
+  const releasesEndpoint =
+    /(?:^|\s)(?:"repos\/\$\{GH_REPO\}\/releases"|'repos\/\$\{GH_REPO\}\/releases'|repos\/\$\{GH_REPO\}\/releases)(?=\s|$)/;
+  const releaseCreationCommands = normalizedGhApiCommands.filter(
+    (command) => postMethod.test(command) && releasesEndpoint.test(command),
   );
   assert.equal(
     releaseCreationCommands.length,
