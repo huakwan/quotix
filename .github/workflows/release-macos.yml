@@ -1,0 +1,188 @@
+name: Create macOS release
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare-release:
+    outputs:
+      release_tag: ${{ steps.version.outputs.release_tag }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Read and validate release version
+        id: version
+        env:
+          CURRENT_REF: ${{ github.ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$CURRENT_REF" = "refs/heads/${DEFAULT_BRANCH}"
+          version="$(node -p "require('./package.json').version")"
+          node -e 'const v = process.argv[1]; if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(v)) process.exit(1)' "$version"
+          release_tag="v${version}"
+          if response="$(gh api --include "repos/${GH_REPO}/git/ref/tags/${release_tag}" 2>&1)"; then
+            echo "Tag ${release_tag} already exists" >&2
+            exit 1
+          elif grep -qE '^HTTP/[^ ]+ 404' <<< "$response"; then
+            :
+          else
+            printf '%s\n' "$response" >&2
+            exit 1
+          fi
+          existing_release_id="$(gh api --paginate "repos/${GH_REPO}/releases?per_page=100" --jq ".[] | select(.tag_name == \"${release_tag}\") | .id" | head -n 1)"
+          if [[ -n "$existing_release_id" ]]; then
+            echo "Release ${release_tag} already exists" >&2
+            exit 1
+          fi
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+
+  build-and-package:
+    needs: prepare-release
+    name: Build macOS (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            binary_arch: x86_64
+            runner: macos-15-intel
+            target: dist-mac-x64
+          - arch: arm64
+            binary_arch: arm64
+            runner: macos-15
+            target: dist-mac-arm64
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build app
+        run: make ${{ matrix.target }}
+
+      - name: Create app archive
+        env:
+          ARCH: ${{ matrix.arch }}
+          BINARY_ARCH: ${{ matrix.binary_arch }}
+          RELEASE_TAG: ${{ needs.prepare-release.outputs.release_tag }}
+        run: |
+          app_path="$(find release -type d -name 'Quotix.app' -prune -print -quit)"
+          test -n "$app_path"
+          actual_arch="$(lipo -archs "$app_path/Contents/MacOS/Quotix")"
+          test "$actual_arch" = "$BINARY_ARCH"
+          safe_tag="${RELEASE_TAG//\//-}"
+          asset_path="Quotix-${safe_tag}-macos-${ARCH}.zip"
+          ditto -c -k --sequesterRsrc --keepParent "$app_path" "$asset_path"
+
+      - name: Store app archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: Quotix-*-macos-${{ matrix.arch }}.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  upload-to-release:
+    needs: [prepare-release, build-and-package]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download app archives
+        uses: actions/download-artifact@v4
+        with:
+          pattern: macos-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create release with app archives
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare-release.outputs.release_tag }}
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          shopt -s nullglob
+          assets=(release-assets/*.zip)
+          test "${#assets[@]}" -eq 2
+          existing_release_id="$(gh api --paginate "repos/${GH_REPO}/releases?per_page=100" --jq ".[] | select(.tag_name == \"${RELEASE_TAG}\") | .id" | head -n 1)"
+          test -z "$existing_release_id"
+          gh api --silent --method POST "repos/${GH_REPO}/git/refs" \
+            -f ref="refs/tags/${RELEASE_TAG}" \
+            -f sha="$TARGET_SHA"
+
+          cleanup_release() {
+            if [[ -n "${release_id:-}" ]]; then
+              gh api --silent --method DELETE "repos/${GH_REPO}/releases/${release_id}" || true
+            fi
+            remaining_release_id="$(gh api --paginate "repos/${GH_REPO}/releases?per_page=100" --jq ".[] | select(.tag_name == \"${RELEASE_TAG}\") | .id" | head -n 1)"
+            current_sha="$(gh api "repos/${GH_REPO}/git/ref/tags/${RELEASE_TAG}" --jq '.object.sha' 2>/dev/null || true)"
+            if [[ -z "$remaining_release_id" && "$current_sha" = "$TARGET_SHA" ]]; then
+              gh api --method DELETE "repos/${GH_REPO}/git/refs/tags/${RELEASE_TAG}" || true
+            fi
+          }
+
+          release_id=""
+          if ! release_id="$(gh api --method POST "repos/${GH_REPO}/releases" \
+              -f tag_name="$RELEASE_TAG" \
+              -f target_commitish="$TARGET_SHA" \
+              -f name="$RELEASE_TAG" \
+              -F draft=true \
+              -F generate_release_notes=true \
+              --jq '.id')"; then
+            cleanup_release
+            exit 1
+          fi
+
+          if ! gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber; then
+            cleanup_release
+            exit 1
+          fi
+
+          if ! gh api --silent --method PATCH "repos/${GH_REPO}/releases/${release_id}" -F draft=false; then
+            release_is_draft="$(gh api "repos/${GH_REPO}/releases/${release_id}" --jq '.draft' 2>/dev/null || true)"
+            if [[ "$release_is_draft" = "false" ]]; then
+              exit 0
+            elif [[ "$release_is_draft" = "true" ]]; then
+              cleanup_release
+            fi
+            exit 1
+          fi

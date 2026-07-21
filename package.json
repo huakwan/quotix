@@ -1,6 +1,6 @@
 {
   "name": "quotix",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Show Claude Code and Codex usage quota in the macOS menu bar.",
   "private": true,
   "main": "dist/main.js",
