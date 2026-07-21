@@ -29,7 +29,9 @@ choice.
 
 ## Requirements
 
-- macOS
+- macOS 12 Monterey or later
+  - Supports both Intel (`x86_64`) and Apple Silicon (`arm64`) Macs
+  - macOS 11 Big Sur and older are not supported
 - Node.js and pnpm for development
 - Claude: sign in once with Claude Code so its OAuth credential exists in
   macOS Keychain
