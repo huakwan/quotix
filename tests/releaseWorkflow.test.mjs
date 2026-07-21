@@ -32,11 +32,29 @@ test("manual releases derive their tag and app archives from package.json", () =
     workflow,
     /arch: arm64\s*\n\s+binary_arch: arm64\s*\n\s+runner: macos-15\s*\n\s+target: dist-mac-arm64/,
   );
-  const buildJob = workflow.slice(workflow.indexOf("  build-and-package:"));
+  const buildJobStart = workflow.indexOf("  build-and-package:");
+  const uploadJobStart = workflow.indexOf("  upload-to-release:");
 
+  assert.notEqual(buildJobStart, -1, "workflow should contain a build job");
+  assert.notEqual(uploadJobStart, -1, "workflow should contain an upload job");
+  assert.ok(buildJobStart < uploadJobStart, "build job should precede upload job");
+
+  const buildJob = workflow.slice(buildJobStart, uploadJobStart);
+  const pnpmSetupIndex = buildJob.indexOf("uses: pnpm/action-setup@v5");
+  const nodeSetupIndex = buildJob.indexOf("uses: actions/setup-node@v6");
+
+  assert.notEqual(
+    pnpmSetupIndex,
+    -1,
+    "build job should use pnpm/action-setup@v5",
+  );
+  assert.notEqual(
+    nodeSetupIndex,
+    -1,
+    "build job should use actions/setup-node@v6",
+  );
   assert.ok(
-    buildJob.indexOf("uses: pnpm/action-setup@v5") <
-      buildJob.indexOf("uses: actions/setup-node@v6"),
+    pnpmSetupIndex < nodeSetupIndex,
     "pnpm should be installed before setup-node configures its cache",
   );
   assert.match(workflow, /persist-credentials: false/);
@@ -51,16 +69,88 @@ test("manual releases derive their tag and app archives from package.json", () =
   assert.doesNotMatch(workflow, /gh release create/);
   assert.match(workflow, /release_id=.*gh api .*--method POST .*\/releases/);
   assert.match(workflow, /-F draft=true/);
-  assert.match(workflow, /-F generate_release_notes=true/);
-  assert.match(workflow, /macOS blocks the app\? \/ macOS ไม่ยอมเปิดแอป\?/);
-  assert.match(workflow, /\*\*English\*\*/);
-  assert.match(workflow, /\*\*ภาษาไทย\*\*/);
-  assert.equal(
-    workflow.match(/xattr -dr com\.apple\.quarantine \/Applications\/Quotix\.app/g)?.length,
-    2,
+  const releaseBodyMatch = workflow.match(
+    /cat > release-body\.md <<'RELEASE_BODY'\n([\s\S]*?)\n\s*RELEASE_BODY(?:\n|$)/,
   );
-  assert.equal(workflow.match(/open \/Applications\/Quotix\.app/g)?.length, 2);
-  assert.match(workflow, /-F body=@release-body\.md/);
+  assert.ok(
+    releaseBodyMatch,
+    "release-body.md heredoc should be present and terminated",
+  );
+  const releaseBody = releaseBodyMatch[1];
+  const englishMarker = "**English**";
+  const thaiMarker = "**ภาษาไทย**";
+  const englishIndex = releaseBody.indexOf(englishMarker);
+  const thaiIndex = releaseBody.indexOf(thaiMarker);
+
+  assert.match(releaseBody, /macOS blocks the app\? \/ macOS ไม่ยอมเปิดแอป\?/);
+  assert.notEqual(
+    englishIndex,
+    -1,
+    "release body should contain an English section",
+  );
+  assert.notEqual(thaiIndex, -1, "release body should contain a Thai section");
+  assert.ok(
+    englishIndex < thaiIndex,
+    "English section should occur before Thai section",
+  );
+
+  const englishSection = releaseBody.slice(
+    englishIndex + englishMarker.length,
+    thaiIndex,
+  );
+  const thaiSection = releaseBody.slice(thaiIndex + thaiMarker.length);
+  const quarantineCommand =
+    "xattr -dr com.apple.quarantine /Applications/Quotix.app";
+  const openCommand = "open /Applications/Quotix.app";
+
+  for (const [language, section] of [
+    ["English", englishSection],
+    ["Thai", thaiSection],
+  ]) {
+    assert.ok(
+      section.includes(quarantineCommand),
+      `${language} section should include xattr command`,
+    );
+    assert.ok(
+      section.includes(openCommand),
+      `${language} section should include open command`,
+    );
+  }
+  assert.ok(
+    englishSection.includes(
+      "Only run these commands for an app downloaded from this official release.",
+    ),
+    "English section should restrict commands to apps from the official release",
+  );
+  assert.ok(
+    thaiSection.includes(
+      "โปรดรันเฉพาะกับแอปที่ดาวน์โหลดจาก Release อย่างเป็นทางการนี้เท่านั้น",
+    ),
+    "Thai section should restrict commands to apps from the official release",
+  );
+
+  const ghApiCommands = workflow.match(/gh api\b(?:\\\n|[^\n])*/g) ?? [];
+  const releaseCreationCommands = ghApiCommands.filter(
+    (command) =>
+      command.includes("--method POST") &&
+      command.includes('"repos/${GH_REPO}/releases"'),
+  );
+  assert.equal(
+    releaseCreationCommands.length,
+    1,
+    "workflow should contain exactly one POST to the releases endpoint",
+  );
+  const releaseCreationCommand = releaseCreationCommands[0];
+  assert.match(
+    releaseCreationCommand,
+    /-F body=@release-body\.md/,
+    "release-creation POST should use release-body.md",
+  );
+  assert.match(
+    releaseCreationCommand,
+    /-F generate_release_notes=true/,
+    "release-creation POST should retain generated release notes",
+  );
   assert.match(workflow, /gh release upload/);
   assert.match(workflow, /GH_REPO: \$\{\{ github\.repository \}\}/);
   assert.match(workflow, /RELEASE_TAG: \$\{\{ needs\.prepare-release\.outputs\.release_tag \}\}/);
