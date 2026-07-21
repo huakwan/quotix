@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
@@ -41,6 +42,45 @@ test("macOS build targets Intel and Apple Silicon from one command", () => {
 
   assert.match(pkg.scripts["dist:mac"], /electron-builder --mac --universal --dir$/);
   assert.equal(pkg.build.mac.minimumSystemVersion, "12.0");
+});
+
+test("Makefile exposes separate Intel, arm64, and Universal macOS builds", () => {
+  const x64 = execFileSync("make", ["-n", "dist-mac-x64"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  const arm64 = execFileSync("make", ["-n", "dist-mac-arm64"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  const universal = execFileSync("make", ["-n", "dist-mac-universal"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  const legacy = execFileSync("make", ["-n", "dist-mac"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+
+  assert.equal(
+    x64,
+    "pnpm run compile\npnpm exec electron-builder --mac --x64 --dir --config.mac.defaultArch=arm64\n",
+  );
+  assert.equal(
+    arm64,
+    "pnpm run compile\npnpm exec electron-builder --mac --arm64 --dir\n",
+  );
+  assert.equal(universal, "pnpm run dist:mac\n");
+  assert.equal(legacy, arm64);
+});
+
+test("Makefile cleans every packaged artifact from the release directory", () => {
+  const clean = execFileSync("make", ["-n", "clean-packages"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+
+  assert.equal(clean, "rm -rf -- release\n");
 });
 
 test("macOS local build uses Electron-compatible ad-hoc signing", () => {
