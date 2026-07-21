@@ -16,9 +16,31 @@
   "build": {
     "appId": "com.huakwan.quotix",
     "productName": "Quotix",
+    "directories": {
+      "output": "release"
+    },
     "files": [
-      "dist/**/*",
-      "assets/**/*"
+      {
+        "from": "dist",
+        "to": "dist",
+        "filter": [
+          "**/*",
+          "!**/*.map",
+          "!mac-*/**"
+        ]
+      },
+      {
+        "from": "assets",
+        "to": "assets",
+        "filter": [
+          "anthropic.svg",
+          "openai.svg"
+        ]
+      }
+    ],
+    "electronLanguages": [
+      "en",
+      "th"
     ],
     "mac": {
       "icon": "assets/icon.icns",
