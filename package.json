@@ -21,6 +21,13 @@
     },
     "files": [
       {
+        "from": ".",
+        "to": ".",
+        "filter": [
+          "package.json"
+        ]
+      },
+      {
         "from": "dist",
         "to": "dist",
         "filter": [

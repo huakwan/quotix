@@ -12,6 +12,11 @@ test("electron-builder keeps packaged output outside compiled app files", () => 
   assert.equal(pkg.build.directories.output, "release");
   assert.deepEqual(pkg.build.files, [
     {
+      from: ".",
+      to: ".",
+      filter: ["package.json"],
+    },
+    {
       from: "dist",
       to: "dist",
       filter: ["**/*", "!**/*.map", "!mac-*/**"],
@@ -23,4 +28,10 @@ test("electron-builder keeps packaged output outside compiled app files", () => 
     },
   ]);
   assert.deepEqual(pkg.build.electronLanguages, ["en", "th"]);
+});
+
+test("git ignores packaged output", () => {
+  const gitignore = readFileSync(join(root, ".gitignore"), "utf8");
+
+  assert.match(gitignore, /^release\/$/m);
 });

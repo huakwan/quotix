@@ -33,7 +33,7 @@ therefore contains a second Electron runtime.
 
 `esbuild` will continue writing runtime code to `dist` so the existing
 `main: dist/main.js` contract remains unchanged. electron-builder will write
-packaged products to `release`.
+packaged products to the git-ignored `release` directory.
 
 The electron-builder `files` setting will use explicit file-set mappings:
 
@@ -54,6 +54,7 @@ locales for the app while removing unused Chromium translations.
 Add a unit test that reads `package.json` and asserts:
 
 - electron-builder output is `release` rather than `dist`;
+- git ignores generated `release` artifacts;
 - packaged file sets are explicit;
 - source maps and legacy macOS output are excluded;
 - only runtime assets are copied;

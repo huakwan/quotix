@@ -4,7 +4,7 @@
 
 **Goal:** Remove the nested Electron runtime from the macOS package and trim files and locales that Quotix does not use.
 
-**Architecture:** Keep esbuild output and the existing `dist/main.js` entry point unchanged, but move electron-builder products to `release`. Define explicit file-set boundaries for runtime code and assets, then guard those boundaries with a package configuration test and verify them against a real ASAR build.
+**Architecture:** Keep esbuild output and the existing `dist/main.js` entry point unchanged, but move electron-builder products to `release`. Define explicit file-set boundaries for runtime code, assets, and the required root `package.json`, then guard those boundaries with a package configuration test and verify them against a real ASAR build.
 
 **Tech Stack:** Node.js test runner, electron-builder 26, Electron 43, pnpm, `@electron/asar`
 
@@ -23,11 +23,12 @@
 
 **Files:**
 - Create: `tests/packageConfig.test.mjs`
+- Modify: `.gitignore`
 - Modify: `package.json:16-31`
 
 **Interfaces:**
 - Consumes: electron-builder configuration from the root `package.json`.
-- Produces: an explicit `build.directories.output`, two `build.files` file sets, and `build.electronLanguages` enforced by a regression test.
+- Produces: an explicit `build.directories.output`, three `build.files` file sets, and `build.electronLanguages` enforced by a regression test.
 
 - [ ] **Step 1: Write the failing package configuration test**
 
@@ -46,6 +47,11 @@ test("electron-builder keeps packaged output outside compiled app files", () => 
   assert.equal(pkg.build.directories.output, "release");
   assert.deepEqual(pkg.build.files, [
     {
+      from: ".",
+      to: ".",
+      filter: ["package.json"],
+    },
+    {
       from: "dist",
       to: "dist",
       filter: ["**/*", "!**/*.map", "!mac-*/**"],
@@ -58,6 +64,12 @@ test("electron-builder keeps packaged output outside compiled app files", () => 
   ]);
   assert.deepEqual(pkg.build.electronLanguages, ["en", "th"]);
 });
+
+test("git ignores packaged output", () => {
+  const gitignore = readFileSync(join(root, ".gitignore"), "utf8");
+
+  assert.match(gitignore, /^release\/$/m);
+});
 ```
 
 - [ ] **Step 2: Run the test and verify the current unsafe config fails**
@@ -68,7 +80,7 @@ Expected: FAIL because `pkg.build.directories` is absent in the current configur
 
 - [ ] **Step 3: Apply the minimal electron-builder configuration**
 
-Replace the current `build.files` block and add `directories` and `electronLanguages`:
+Add `release/` to `.gitignore`. Replace the current `build.files` block and add `directories` and `electronLanguages`:
 
 ```json
 "build": {
@@ -78,6 +90,13 @@ Replace the current `build.files` block and add `directories` and `electronLangu
     "output": "release"
   },
   "files": [
+    {
+      "from": ".",
+      "to": ".",
+      "filter": [
+        "package.json"
+      ]
+    },
     {
       "from": "dist",
       "to": "dist",
