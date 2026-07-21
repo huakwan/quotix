@@ -146,9 +146,7 @@ jobs:
           existing_release_id="$(gh api --paginate "repos/${GH_REPO}/releases?per_page=100" --jq ".[] | select(.tag_name == \"${RELEASE_TAG}\") | .id" | head -n 1)"
           test -z "$existing_release_id"
           cat > release-body.md <<'RELEASE_BODY'
-          ### macOS blocks the app? / macOS ไม่ยอมเปิดแอป?
-
-          **English**
+          ### macOS blocks the app?
 
           If you downloaded Quotix from this official GitHub release and macOS prevents it from opening, move the app to `/Applications`, then run:
 
@@ -159,7 +157,7 @@ jobs:
 
           This removes macOS quarantine metadata from this copy of Quotix. Only run these commands for an app downloaded from this official release.
 
-          **ภาษาไทย**
+          ### macOS ไม่ยอมเปิดแอป?
 
           หากดาวน์โหลด Quotix จาก GitHub Release อย่างเป็นทางการนี้แล้ว macOS ไม่ยอมเปิดแอป ให้ย้ายแอปไปที่ `/Applications` แล้วรัน:
 
