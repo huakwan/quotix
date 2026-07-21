@@ -35,22 +35,32 @@ test("manual releases derive their tag and app archives from package.json", () =
   const buildJob = workflow.slice(workflow.indexOf("  build-and-package:"));
 
   assert.ok(
-    buildJob.indexOf("uses: pnpm/action-setup@v4") <
+    buildJob.indexOf("uses: pnpm/action-setup@v5") <
       buildJob.indexOf("uses: actions/setup-node@v6"),
     "pnpm should be installed before setup-node configures its cache",
   );
   assert.match(workflow, /persist-credentials: false/);
   assert.match(workflow, /lipo -archs/);
-  assert.match(workflow, /uses: actions\/upload-artifact@v4/);
+  assert.match(workflow, /uses: actions\/upload-artifact@v6/);
   assert.match(workflow, /retention-days: 1/);
   assert.match(workflow, /build-and-package:[\s\S]*?needs: prepare-release/);
   assert.match(workflow, /upload-to-release:\s*\n\s+needs: \[prepare-release, build-and-package\]/);
   assert.match(workflow, /upload-to-release:[\s\S]*?permissions:\s*\n\s+contents: write/);
-  assert.match(workflow, /uses: actions\/download-artifact@v4/);
+  assert.match(workflow, /uses: actions\/download-artifact@v7/);
+  assert.doesNotMatch(workflow, /(?:pnpm\/action-setup|actions\/(?:upload|download)-artifact)@v4/);
   assert.doesNotMatch(workflow, /gh release create/);
   assert.match(workflow, /release_id=.*gh api .*--method POST .*\/releases/);
   assert.match(workflow, /-F draft=true/);
   assert.match(workflow, /-F generate_release_notes=true/);
+  assert.match(workflow, /macOS blocks the app\? \/ macOS ไม่ยอมเปิดแอป\?/);
+  assert.match(workflow, /\*\*English\*\*/);
+  assert.match(workflow, /\*\*ภาษาไทย\*\*/);
+  assert.equal(
+    workflow.match(/xattr -dr com\.apple\.quarantine \/Applications\/Quotix\.app/g)?.length,
+    2,
+  );
+  assert.equal(workflow.match(/open \/Applications\/Quotix\.app/g)?.length, 2);
+  assert.match(workflow, /-F body=@release-body\.md/);
   assert.match(workflow, /gh release upload/);
   assert.match(workflow, /GH_REPO: \$\{\{ github\.repository \}\}/);
   assert.match(workflow, /RELEASE_TAG: \$\{\{ needs\.prepare-release\.outputs\.release_tag \}\}/);

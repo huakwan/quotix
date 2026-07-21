@@ -81,7 +81,7 @@ jobs:
           persist-credentials: false
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
         with:
           version: 10
 
@@ -112,7 +112,7 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent "$app_path" "$asset_path"
 
       - name: Store app archive
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: macos-${{ matrix.arch }}
           path: Quotix-*-macos-${{ matrix.arch }}.zip
@@ -127,7 +127,7 @@ jobs:
 
     steps:
       - name: Download app archives
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: macos-*
           path: release-assets
@@ -145,6 +145,31 @@ jobs:
           test "${#assets[@]}" -eq 2
           existing_release_id="$(gh api --paginate "repos/${GH_REPO}/releases?per_page=100" --jq ".[] | select(.tag_name == \"${RELEASE_TAG}\") | .id" | head -n 1)"
           test -z "$existing_release_id"
+          cat > release-body.md <<'RELEASE_BODY'
+          ### macOS blocks the app? / macOS ไม่ยอมเปิดแอป?
+
+          **English**
+
+          If you downloaded Quotix from this official GitHub release and macOS prevents it from opening, move the app to `/Applications`, then run:
+
+          ```sh
+          xattr -dr com.apple.quarantine /Applications/Quotix.app
+          open /Applications/Quotix.app
+          ```
+
+          This removes macOS quarantine metadata from this copy of Quotix. Only run these commands for an app downloaded from this official release.
+
+          **ภาษาไทย**
+
+          หากดาวน์โหลด Quotix จาก GitHub Release อย่างเป็นทางการนี้แล้ว macOS ไม่ยอมเปิดแอป ให้ย้ายแอปไปที่ `/Applications` แล้วรัน:
+
+          ```sh
+          xattr -dr com.apple.quarantine /Applications/Quotix.app
+          open /Applications/Quotix.app
+          ```
+
+          คำสั่งนี้จะลบข้อมูล quarantine ของ macOS ออกจาก Quotix ชุดนี้ โปรดรันเฉพาะกับแอปที่ดาวน์โหลดจาก Release อย่างเป็นทางการนี้เท่านั้น
+          RELEASE_BODY
           gh api --silent --method POST "repos/${GH_REPO}/git/refs" \
             -f ref="refs/tags/${RELEASE_TAG}" \
             -f sha="$TARGET_SHA"
@@ -166,6 +191,7 @@ jobs:
               -f target_commitish="$TARGET_SHA" \
               -f name="$RELEASE_TAG" \
               -F draft=true \
+              -F body=@release-body.md \
               -F generate_release_notes=true \
               --jq '.id')"; then
             cleanup_release
