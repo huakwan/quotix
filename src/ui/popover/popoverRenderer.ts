@@ -1,6 +1,7 @@
 import { canActivateUpdateAction, quotaRowsForProvider, sectionsForPayload, showMenuBarSetting, updatePresentation, type PopoverPayload, type UpdateAction, } from "./popoverState";
 import type { DisplaySource, ProviderId, QuotaWindow, SourceState } from "../../quota/model";
 import type { ResetMode } from "../../preferences";
+import { keepButtonsUnfocused } from "../buttonFocus";
 
 declare global {
   interface QuotixApi {
@@ -177,19 +178,22 @@ function draw(): void {
   const updateRow = document.getElementById("update-row")!;
   const updateLabel = document.getElementById("update-label")!;
   const updateButton = document.getElementById("update-action")! as HTMLButtonElement;
-  const updateProgress = document.getElementById("update-progress")! as HTMLProgressElement;
+  const updateProgress = document.getElementById("update-progress")!;
+  const updateProgressFill = document.getElementById("update-progress-fill")!;
+  const progress = update.progress ?? 0;
   updateRow.classList.toggle("hidden", !update.visible);
-  updateLabel.textContent = update.label;
+  updateLabel.textContent = update.progress === null
+    ? update.label
+    : `${update.label} ${Math.round(progress)}%`;
   currentUpdateAction = update.action;
   updateButton.textContent = update.actionLabel;
   updateButton.classList.toggle("hidden", update.action === null);
   updateButton.disabled = update.action === null;
-  updateButton.tabIndex = update.action === "download" ? -1 : 0;
-  if (update.action === "download" && document.activeElement === updateButton) {
-    updateButton.blur();
-  }
+  updateButton.tabIndex = -1;
+  if (document.activeElement === updateButton) { updateButton.blur(); }
   updateProgress.classList.toggle("hidden", update.progress === null);
-  updateProgress.value = update.progress ?? 0;
+  updateProgress.setAttribute("aria-valuenow", String(Math.round(progress)));
+  updateProgressFill.style.width = `${progress}%`;
 }
 
 function onSegment(id: string, callback: (value: string) => void): void {
@@ -200,6 +204,7 @@ function onSegment(id: string, callback: (value: string) => void): void {
 }
 
 window.quotix.onUpdate((payload) => { last = payload; draw(); });
+keepButtonsUnfocused();
 onSegment("source-mode", (value) => window.quotix.setSource(value as DisplaySource));
 onSegment("menu-source", (value) => window.quotix.setMenuBarSource(value as ProviderId));
 onSegment("reset-mode", (value) => window.quotix.setResetMode(value as ResetMode));
@@ -208,9 +213,6 @@ onSegment("login-mode", (value) => window.quotix.setOpenAtLogin(value === "on"))
 document.getElementById("refresh")!.addEventListener("click", () => window.quotix.refresh());
 document.getElementById("about")!.addEventListener("click", () => window.quotix.openAbout());
 const updateActionButton = document.getElementById("update-action")!;
-updateActionButton.addEventListener("mousedown", (event) => {
-  if (currentUpdateAction === "download") { event.preventDefault(); }
-});
 updateActionButton.addEventListener("click", (event) => {
   if (!canActivateUpdateAction(currentUpdateAction, event.detail)) { return; }
   switch (currentUpdateAction) {

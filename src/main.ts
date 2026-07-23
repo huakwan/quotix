@@ -74,6 +74,16 @@ function refreshOpenAtLoginPreference(): void {
   savePreferences(app.getPath("userData"), preferences);
 }
 
+function renderPopover(snapshot = currentSnapshot()): void {
+  if (!snapshot || !popover || popover.isDestroyed()) { return; }
+  popover.webContents.send("quota:update", {
+    snapshot,
+    preferences,
+    nowSec: Math.floor(Date.now() / 1000),
+    update: updateCoordinator?.view() ?? { status: "idle" },
+  });
+}
+
 function render(): void {
   const snapshot = currentSnapshot();
   if (!tray || !snapshot) { return; }
@@ -81,14 +91,7 @@ function render(): void {
   const provider = effectiveMenuBarSource(preferences);
   tray.setTitle("");
   void updateTray(provider, snapshot);
-  if (popover && !popover.isDestroyed()) {
-    popover.webContents.send("quota:update", {
-      snapshot,
-      preferences,
-      nowSec: Math.floor(Date.now() / 1000),
-      update: updateCoordinator?.view() ?? { status: "idle" },
-    });
-  }
+  renderPopover(snapshot);
 }
 
 async function updateTray(provider: ProviderId, snapshot: QuotaSnapshot): Promise<void> {
@@ -306,7 +309,7 @@ app.whenReady().then(async () => {
     reveal: async (update) => shell.showItemInFolder(update.appPath),
     cleanup: async (update) => rm(update.stagingRoot, { recursive: true, force: true }),
   });
-  unsubscribeUpdate = updateCoordinator.subscribe(render);
+  unsubscribeUpdate = updateCoordinator.subscribe(() => renderPopover());
 
   registerIpc();
   render();

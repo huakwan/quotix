@@ -268,7 +268,16 @@
         height: 4px;
         display: block;
         margin-top: 4px;
-        accent-color: var(--green);
+        overflow: hidden;
+        border-radius: 2px;
+        background: var(--track);
+      }
+      .update-progress-fill {
+        width: 0;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--green);
+        transition: width 120ms linear;
       }
       .update-btn {
         border: 0;
@@ -408,18 +417,23 @@
       <div class="update-row hidden" id="update-row">
         <div class="update-copy">
           <div class="update-label" id="update-label"></div>
-          <progress
+          <div
             class="update-progress hidden"
             id="update-progress"
-            max="100"
-            value="0"
+            role="progressbar"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="0"
             aria-label="Update download progress"
-          ></progress>
+          >
+            <div class="update-progress-fill" id="update-progress-fill"></div>
+          </div>
         </div>
         <button
           class="update-btn hidden"
           id="update-action"
           type="button"
+          tabindex="-1"
         ></button>
       </div>
       <div class="footer">

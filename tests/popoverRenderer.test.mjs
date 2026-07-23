@@ -61,18 +61,37 @@ test("popover wires only named assisted-update actions", () => {
   assert.match(preload, /ipcRenderer\.send\("update:download"\)/);
   assert.doesNotMatch(preload, /send:\s*ipcRenderer\.send/);
   assert.doesNotMatch(renderer, /stagingRoot|appPath|browser_download_url/);
-  assert.match(renderer, /updateLabel\.textContent = update\.label/);
+  assert.match(renderer, /updateLabel\.textContent = update\.progress/);
 });
 
-test("download update is mouse-only and never retains focus", () => {
+test("download progress uses a visible fill and numeric percentage", () => {
   const renderer = readFileSync(join(root, "src/ui/popover/popoverRenderer.ts"), "utf8");
+  const html = readFileSync(join(root, "src/ui/popover/popover.html"), "utf8");
+  const main = readFileSync(join(root, "src/main.ts"), "utf8");
 
-  assert.match(renderer, /updateButton\.tabIndex = update\.action === "download" \? -1 : 0/);
-  assert.match(renderer, /update\.action === "download" && document\.activeElement === updateButton/);
-  assert.match(
-    renderer,
-    /addEventListener\("mousedown", \(event\) => \{\s*if \(currentUpdateAction === "download"\) \{ event\.preventDefault\(\); \}/,
-  );
+  assert.match(html, /role="progressbar"/);
+  assert.match(html, /class="update-progress-fill" id="update-progress-fill"/);
+  assert.match(renderer, /`\$\{update\.label\} \$\{Math\.round\(progress\)\}%`/);
+  assert.match(renderer, /updateProgressFill\.style\.width = `\$\{progress\}%`/);
+  assert.match(renderer, /updateProgress\.setAttribute\("aria-valuenow"/);
+  assert.match(main, /updateCoordinator\.subscribe\(\(\) => renderPopover\(\)\)/);
+});
+
+test("update actions never retain focus", () => {
+  const renderer = readFileSync(join(root, "src/ui/popover/popoverRenderer.ts"), "utf8");
+  const html = readFileSync(join(root, "src/ui/popover/popover.html"), "utf8");
+  const aboutRenderer = readFileSync(join(root, "src/ui/about/aboutRenderer.ts"), "utf8");
+  const buttonFocus = readFileSync(join(root, "src/ui/buttonFocus.ts"), "utf8");
+
+  assert.match(html, /id="update-action"[\s\S]*?tabindex="-1"/);
+  assert.match(renderer, /updateButton\.tabIndex = -1/);
+  assert.match(renderer, /document\.activeElement === updateButton/);
+  assert.match(renderer, /keepButtonsUnfocused\(\)/);
+  assert.match(aboutRenderer, /keepButtonsUnfocused\(\)/);
+  assert.match(buttonFocus, /button\.tabIndex = -1/);
+  assert.match(buttonFocus, /"mousedown", \(event\) => event\.preventDefault\(\)/);
+  assert.match(buttonFocus, /"mouseup", \(\) => button\.blur\(\)/);
+  assert.match(buttonFocus, /"click", \(\) => button\.blur\(\)/);
   assert.match(renderer, /canActivateUpdateAction\(currentUpdateAction, event\.detail\)/);
   assert.match(renderer, /case "download": window\.quotix\.downloadUpdate\(\)/);
 });

@@ -56,6 +56,28 @@ test("update coordinator is quiet for automatic errors and visible for manual er
   });
 });
 
+test("known available update stays visible without checking again", async () => {
+  let checkCalls = 0;
+  const states = [];
+  const coordinator = new UpdateCoordinator({
+    check: async () => {
+      checkCalls += 1;
+      return { status: "available", release };
+    },
+    stage: async () => { throw new Error("unused"); },
+    install: async () => "installing",
+    reveal: async () => undefined,
+  });
+  coordinator.subscribe((state) => states.push(state.status));
+
+  await coordinator.check(true);
+  await assert.rejects(() => coordinator.check(true), { code: "update_action_invalid" });
+
+  assert.equal(checkCalls, 1);
+  assert.deepEqual(states, ["checking", "available"]);
+  assert.deepEqual(coordinator.view(), { status: "available", version: "1.0.7" });
+});
+
 test("update coordinator rejects duplicate invalid actions and cancels a download", async () => {
   let resolveStage;
   const coordinator = new UpdateCoordinator({

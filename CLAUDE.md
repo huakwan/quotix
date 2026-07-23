@@ -39,6 +39,12 @@ backoff. Manual refresh does not bypass active backoff.
 Never log or persist OAuth tokens, Keychain output, Codex credentials, or raw
 app-server payloads. Cache only normalized quota fields.
 
+## UI interaction rules
+
+Buttons must never retain focus. Keep every button out of the tab order,
+prevent mouse presses from assigning focus, and clear any programmatic or
+browser-assigned focus immediately on mouse release and click.
+
 ## User workflow preference
 
 For small, clearly scoped edits, implement the change directly without using
