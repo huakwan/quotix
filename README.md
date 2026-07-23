@@ -105,3 +105,7 @@ see [`docs/update-signing.md`](docs/update-signing.md).
 
 Only successful normalized quota data is cached. Claude and Codex caches are
 separate, and the legacy Claude cache is still accepted as a startup fallback.
+
+## License
+
+Quotix is available under the [MIT License](LICENSE).
