@@ -8,6 +8,11 @@ import { compareVersions, parseAppVersion, parseReleaseTag } from "./version";
 
 const API_URL = "https://api.github.com/repos/huakwan/quotix/releases/latest";
 const MAX_METADATA_BYTES = 1024 * 1024;
+const TRUSTED_ASSET_HOSTS = new Set([
+  "github.com",
+  "release-assets.githubusercontent.com",
+  "objects.githubusercontent.com",
+]);
 
 interface ReleaseAssetJson {
   name: string;
@@ -42,6 +47,47 @@ async function boundedBytes(response: Response, errorCode: string): Promise<Buff
   const bytes = Buffer.from(await response.arrayBuffer());
   if (bytes.length > MAX_METADATA_BYTES) { throw new UpdateError(errorCode); }
   return bytes;
+}
+
+function trustedRedirect(value: string | URL): URL {
+  try {
+    const url = new URL(value);
+    if (
+      url.protocol === "https:"
+      && TRUSTED_ASSET_HOSTS.has(url.hostname)
+      && !url.username
+      && !url.password
+    ) {
+      return url;
+    }
+  } catch {
+    // handled below
+  }
+  throw new UpdateError("manifest_fetch_failed");
+}
+
+async function fetchMetadata(
+  fetchImpl: typeof fetch,
+  initialUrl: string,
+): Promise<Buffer> {
+  let url = trustedRedirect(initialUrl);
+  for (let redirects = 0; redirects <= 5; redirects += 1) {
+    let response: Response;
+    try {
+      response = await fetchImpl(url, { redirect: "manual" });
+    } catch {
+      throw new UpdateError("manifest_fetch_failed");
+    }
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      if (redirects === 5) { throw new UpdateError("manifest_fetch_failed"); }
+      const location = response.headers.get("location");
+      if (!location) { throw new UpdateError("manifest_fetch_failed"); }
+      url = trustedRedirect(new URL(location, url));
+      continue;
+    }
+    return boundedBytes(response, "manifest_fetch_failed");
+  }
+  throw new UpdateError("manifest_fetch_failed");
 }
 
 function parseRelease(value: unknown): ReleaseJson {
@@ -132,13 +178,9 @@ export class ReleaseChecker {
 
     const manifestAsset = exactAsset(release, "quotix-update.json");
     const signatureAsset = exactAsset(release, "quotix-update.json.sig");
-    const [manifestResponse, signatureResponse] = await Promise.all([
-      this.options.fetchImpl(manifestAsset.browser_download_url, { redirect: "error" }),
-      this.options.fetchImpl(signatureAsset.browser_download_url, { redirect: "error" }),
-    ]);
     const [rawManifest, rawSignature] = await Promise.all([
-      boundedBytes(manifestResponse, "manifest_fetch_failed"),
-      boundedBytes(signatureResponse, "manifest_fetch_failed"),
+      fetchMetadata(this.options.fetchImpl, manifestAsset.browser_download_url),
+      fetchMetadata(this.options.fetchImpl, signatureAsset.browser_download_url),
     ]);
     const manifest = verifyManifest(rawManifest, rawSignature.toString("utf8"), this.options.publicKey);
     if (manifest.version !== latest.value) {

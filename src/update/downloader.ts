@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, open, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { UpdateError } from "./model";
+import { MAX_UPDATE_BYTES } from "./manifest";
 
 const TRUSTED_HOSTS = new Set([
   "github.com",
@@ -70,6 +71,7 @@ export async function downloadAsset(options: DownloadOptions): Promise<string> {
   if (
     !Number.isSafeInteger(options.size)
     || options.size <= 0
+    || options.size > MAX_UPDATE_BYTES
     || !/^[a-f0-9]{64}$/.test(options.sha256)
     || !/^[A-Za-z0-9._-]+\.zip$/.test(options.filename)
   ) {

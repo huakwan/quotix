@@ -26,7 +26,7 @@ Implementation can begin with generated test keys, but it cannot be declared rel
 
 1. Generate an Ed25519 key pair on a trusted local machine.
 2. Add the private PKCS#8 PEM as the GitHub Actions secret `UPDATE_SIGNING_PRIVATE_KEY` without sharing or committing it.
-3. Provide only the SPKI public PEM for `src/update/update-public-key.pem`.
+3. Provide only the SPKI public PEM for `src/update/quotix-update-public.pem`.
 4. Record the public-key fingerprint in `docs/update-signing.md` and verify that the workflow derives the same public key from its secret.
 
 The production private key must never appear in terminal output captured by the agent, repository files, test fixtures, build artifacts, or logs.
@@ -41,7 +41,7 @@ The production private key must never appear in terminal output captured by the 
 - Create: `src/update/version.ts`
 - Create: `src/update/manifest.ts`
 - Create: `src/update/releaseChecker.ts`
-- Create: `src/update/update-public-key.pem` (owner-supplied public key only)
+- Create: `src/update/quotix-update-public.pem` (owner-supplied public key only)
 - Create: `src/pem.d.ts`
 - Create: `tests/updateVersion.test.mjs`
 - Create: `tests/updateManifest.test.mjs`

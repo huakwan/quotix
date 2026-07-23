@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { UpdateCoordinator } from "../out/src/update/coordinator.js";
+import { UpdateError } from "../out/src/update/model.js";
 
 const release = {
   version: "1.0.7",
@@ -74,4 +75,19 @@ test("update coordinator rejects duplicate invalid actions and cancels a downloa
   await pending;
   assert.equal(coordinator.view().status, "available");
   resolveStage?.();
+});
+
+test("update coordinator keeps a verified update ready when install is cancelled", async () => {
+  const coordinator = new UpdateCoordinator({
+    check: async () => ({ status: "available", release }),
+    stage: async () => ({
+      version: "1.0.7", stagingRoot: "/tmp/update", appPath: "/tmp/update/Quotix.app",
+    }),
+    install: async () => { throw new UpdateError("install_cancelled"); },
+    reveal: async () => undefined,
+  });
+  await coordinator.check(true);
+  await coordinator.download();
+  await coordinator.install();
+  assert.deepEqual(coordinator.view(), { status: "ready", version: "1.0.7" });
 });

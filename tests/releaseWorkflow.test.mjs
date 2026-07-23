@@ -70,7 +70,7 @@ test("manual releases derive their tag and app archives from package.json", () =
   assert.match(workflow, /Create and verify signed update manifest/);
   assert.match(workflow, /UPDATE_SIGNING_PRIVATE_KEY: \$\{\{ secrets\.UPDATE_SIGNING_PRIVATE_KEY \}\}/);
   assert.match(workflow, /node scripts\/create-update-manifest\.mjs/);
-  assert.match(workflow, /--public-key src\/update\/update-public-key\.pem/);
+  assert.match(workflow, /--public-key src\/update\/quotix-update-public\.pem/);
   assert.match(workflow, /release-assets\/quotix-update\.json/);
   assert.match(workflow, /release-assets\/quotix-update\.json\.sig/);
   assert.doesNotMatch(workflow, /(?:pnpm\/action-setup|actions\/(?:upload|download)-artifact)@v4/);

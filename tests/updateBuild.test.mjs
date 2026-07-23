@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createPublicKey } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
@@ -22,9 +23,8 @@ test("production private update keys are absent from package inputs", () => {
   const files = JSON.stringify(pkg.build.files);
   assert.match(files, /dist/);
   assert.doesNotMatch(files, /private.*(?:pem|key)/i);
-  assert.equal(
-    readFileSync(join(root, "src", "update", "update-public-key.pem"), "utf8").trim(),
-    "UNCONFIGURED",
-    "release readiness test must be changed when the owner supplies the public key",
+  const publicKey = createPublicKey(
+    readFileSync(join(root, "src", "update", "quotix-update-public.pem"), "utf8"),
   );
+  assert.equal(publicKey.asymmetricKeyType, "ed25519");
 });

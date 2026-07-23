@@ -115,8 +115,10 @@ export class UpdateCoordinator {
     try {
       const result = await this.deps.install(update);
       this.setState({ status: result, version: update.version });
-    } catch {
-      this.setState({ status: "error", error: "Unable to install the update." });
+    } catch (error) {
+      this.setState(error instanceof UpdateError && error.code === "install_cancelled"
+        ? { status: "ready", version: update.version }
+        : { status: "error", error: "Unable to install the update." });
     }
   }
 

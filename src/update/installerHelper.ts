@@ -92,16 +92,23 @@ async function waitForExit(pid: number): Promise<void> {
     try {
       process.kill(pid, 0);
       await new Promise((resolve) => setTimeout(resolve, 100));
-    } catch {
-      return;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ESRCH") { return; }
+      throw error;
     }
   }
 }
 
 async function launch(path: string, args: string[]): Promise<ChildProcess> {
-  const child = spawn(path, args, { detached: true, stdio: "ignore" });
-  child.unref();
-  return child;
+  return new Promise((resolve, reject) => {
+    const child = spawn(path, args, { detached: true, stdio: "ignore" });
+    child.once("error", reject);
+    child.once("spawn", () => {
+      child.removeListener("error", reject);
+      child.unref();
+      resolve(child);
+    });
+  });
 }
 
 async function main(): Promise<void> {

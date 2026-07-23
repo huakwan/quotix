@@ -35,7 +35,7 @@ import { acknowledgeUpdatedLaunch, installVerifiedUpdate } from "./update/instal
 import type { UpdateArch } from "./update/model";
 import { ReleaseChecker } from "./update/releaseChecker";
 import { stageUpdate } from "./update/stager";
-import updatePublicKey from "./update/update-public-key.pem";
+import updatePublicKey from "./update/quotix-update-public.pem";
 
 const REFRESH_INTERVAL_SECONDS = 2 * 60;
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;

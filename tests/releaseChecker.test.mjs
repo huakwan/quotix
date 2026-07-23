@@ -122,3 +122,53 @@ test("release checker surfaces a sanitized GitHub rate-limit code", async () => 
     message: "release_rate_limited",
   });
 });
+
+test("release checker follows only trusted metadata redirects", async () => {
+  const data = fixture();
+  let redirectedManifest = false;
+  const checker = new ReleaseChecker({
+    fetchImpl: async (input) => {
+      const url = String(input);
+      if (url.endsWith("/releases/latest")) {
+        return new Response(JSON.stringify(data.release), { status: 200 });
+      }
+      if (url.endsWith("quotix-update.json") && !redirectedManifest) {
+        redirectedManifest = true;
+        return new Response(null, {
+          status: 302,
+          headers: { location: "https://release-assets.githubusercontent.com/manifest" },
+        });
+      }
+      if (url === "https://release-assets.githubusercontent.com/manifest") {
+        return new Response(data.manifest, { status: 200 });
+      }
+      if (url.endsWith("quotix-update.json.sig")) {
+        return new Response(data.signature, { status: 200 });
+      }
+      throw new Error(`unexpected URL: ${url}`);
+    },
+    publicKey: publicPem,
+    appVersion: "1.0.6",
+    arch: "arm64",
+  });
+  assert.equal((await checker.check()).status, "available");
+
+  data.release.assets[0].browser_download_url =
+    "https://github.com/huakwan/quotix/releases/download/v1.0.7/quotix-update.json";
+  const untrusted = new ReleaseChecker({
+    fetchImpl: async (input) => {
+      const url = String(input);
+      if (url.endsWith("/releases/latest")) {
+        return new Response(JSON.stringify(data.release), { status: 200 });
+      }
+      return new Response(null, {
+        status: 302,
+        headers: { location: "https://evil.example/manifest" },
+      });
+    },
+    publicKey: publicPem,
+    appVersion: "1.0.6",
+    arch: "arm64",
+  });
+  await assert.rejects(() => untrusted.check(), { code: "manifest_fetch_failed" });
+});

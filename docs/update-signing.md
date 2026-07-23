@@ -18,8 +18,8 @@ openssl pkey -in quotix-update-private.pem -pubout -out quotix-update-public.pem
 
 Then:
 
-1. Replace `src/update/update-public-key.pem` with the contents of
-   `quotix-update-public.pem` and commit the public file.
+1. Copy the public key to `src/update/quotix-update-public.pem` and commit that
+   public file.
 2. In GitHub repository settings, create the Actions secret
    `UPDATE_SIGNING_PRIVATE_KEY` and paste the complete private PKCS#8 PEM.
 3. Keep the private file in an encrypted secret store or offline backup.
@@ -40,7 +40,7 @@ openssl pkey -pubin -in quotix-update-public.pem -outform DER |
 The fingerprint is public. Add it below when provisioning the production key:
 
 ```text
-Production Ed25519 SPKI SHA-256: UNCONFIGURED
+Production Ed25519 SPKI SHA-256: c9ca70ae4614c45e2b0dd177ed6923967d68247bea49d3d93179071e2d228e56
 ```
 
 ## Rotation
