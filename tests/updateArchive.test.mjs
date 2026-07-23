@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { inspectArchive, validateArchiveEntries } from "../out/src/update/archive.js";
+import {
+  extractArchive,
+  inspectArchive,
+  validateArchiveEntries,
+} from "../out/src/update/archive.js";
 
 test("archive preflight accepts one contained Quotix app", () => {
   assert.doesNotThrow(() => validateArchiveEntries([
@@ -58,4 +62,37 @@ test("archive preflight accepts the exact ditto format produced by the release w
   const entries = await inspectArchive(archive);
   assert.ok(entries.some((entry) => entry.name === "Quotix.app/Contents/MacOS/Quotix"));
   assert.equal(entries.some((entry) => entry.name.startsWith("__MACOSX/")), false);
+});
+
+test("archive extraction compares links against the canonical staging root", async () => {
+  const root = await mkdtemp(join(tmpdir(), "quotix-archive-links-"));
+  const aliasRoot = `${root}-alias`;
+  await symlink(root, aliasRoot, "dir");
+  const appPath = join(root, "source", "Quotix.app");
+  const versions = join(appPath, "Contents", "Frameworks", "Safe.framework", "Versions");
+  await mkdir(join(versions, "A"), { recursive: true });
+  await symlink("A", join(versions, "Current"));
+  const archive = join(root, "contained.zip");
+  execFileSync("/usr/bin/ditto", ["-c", "-k", "--keepParent", appPath, archive]);
+
+  await mkdir(join(root, "extracted"));
+  assert.equal(
+    await extractArchive(archive, join(aliasRoot, "extracted")),
+    join(aliasRoot, "extracted", "Quotix.app"),
+  );
+});
+
+test("archive extraction rejects a link that resolves outside the app", async () => {
+  const root = await mkdtemp(join(tmpdir(), "quotix-archive-escape-"));
+  const appPath = join(root, "source", "Quotix.app");
+  await mkdir(join(appPath, "Contents"), { recursive: true });
+  await symlink("../../outside", join(appPath, "Contents", "escape"));
+  const archive = join(root, "escape.zip");
+  execFileSync("/usr/bin/ditto", ["-c", "-k", "--keepParent", appPath, archive]);
+  await mkdir(join(root, "extracted"));
+
+  await assert.rejects(
+    extractArchive(archive, join(root, "extracted")),
+    { code: "archive_unsafe" },
+  );
 });

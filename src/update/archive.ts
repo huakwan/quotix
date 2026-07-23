@@ -137,6 +137,7 @@ export async function inspectArchive(zipPath: string): Promise<ArchiveEntryInfo[
 }
 
 async function verifyExtractedLinks(root: string, current = root): Promise<void> {
+  const canonicalRoot = await realpath(root);
   for (const entry of await readdir(current, { withFileTypes: true })) {
     const path = resolve(current, entry.name);
     const stats = await lstat(path);
@@ -147,7 +148,7 @@ async function verifyExtractedLinks(root: string, current = root): Promise<void>
       } catch {
         throw new UpdateError("archive_unsafe");
       }
-      if (!contained(root, target)) { throw new UpdateError("archive_unsafe"); }
+      if (!contained(canonicalRoot, target)) { throw new UpdateError("archive_unsafe"); }
     } else if (stats.isDirectory()) {
       await verifyExtractedLinks(root, path);
     }
