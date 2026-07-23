@@ -146,6 +146,44 @@ test("startup recovery restores the only usable backup even after a recorded com
   assert.equal(await readFile(join(value.installedApp, "version"), "utf8"), "last usable app");
 });
 
+test("startup recovery removes the backup when the transaction records a differently cased staging root", async () => {
+  const root = await mkdtemp(join(tmpdir(), "quotix-recovery-"));
+  const updatesRoot = join(root, "updates");
+  const stagingRoot = join(updatesRoot, "update-test");
+  // The transaction was written by an older build whose userData path used a
+  // different case (e.g. "quotix" vs "Quotix"); the on-disk dir is the same.
+  const recordedStagingRoot = join(root, "UPDATES", "update-test");
+  const installedApp = join(root, "Applications", "Quotix.app");
+  const token = "b".repeat(64);
+  const transaction = {
+    schemaVersion: 1,
+    version: "1.0.7",
+    stagingRoot: recordedStagingRoot,
+    installedApp,
+    stagedApp: join(recordedStagingRoot, "extracted", "Quotix.app"),
+    backupApp: `${installedApp}.update-backup-${token.slice(0, 12)}`,
+    markerPath: join(recordedStagingRoot, "launch-success"),
+    resultPath: join(recordedStagingRoot, "install-result.json"),
+    token,
+    originalPid: 123,
+    phase: "complete",
+  };
+  await mkdir(stagingRoot, { recursive: true });
+  await writeFile(join(stagingRoot, "install-transaction.json"), JSON.stringify(transaction));
+  await mkdir(installedApp, { recursive: true });
+  await mkdir(transaction.backupApp, { recursive: true });
+
+  const notices = await recoverInterruptedUpdates({
+    updatesRoot,
+    currentBundlePath: installedApp,
+    currentVersion: "1.0.7",
+  });
+
+  assert.deepEqual(notices, []);
+  assert.equal(await pathExists(transaction.backupApp), false);
+  assert.equal(await pathExists(stagingRoot), false);
+});
+
 test("startup recovery preserves a corrupt transaction for manual inspection", async () => {
   const value = await fixture("prepared");
   await writeFile(join(value.stagingRoot, "install-transaction.json"), "{broken");

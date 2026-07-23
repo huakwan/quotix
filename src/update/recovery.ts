@@ -1,4 +1,4 @@
-import { readFile, readdir, rename, rm, stat } from "node:fs/promises";
+import { readFile, readdir, realpath, rename, rm, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { isContainedPath } from "./installPaths";
 import {
@@ -18,6 +18,15 @@ export interface RecoveryOptions {
   currentVersion: string;
   skipTransactionPath?: string;
   removeBackup?(path: string): Promise<void>;
+}
+
+async function isSameDirectory(a: string, b: string): Promise<boolean> {
+  if (a === b) { return true; }
+  try {
+    return await realpath(a) === await realpath(b);
+  } catch {
+    return a.toLowerCase() === b.toLowerCase();
+  }
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -88,7 +97,7 @@ async function recoverOne(
   const transactionFileExists = await exists(transactionPath);
   const transaction = transactionFileExists ? await readTransaction(transactionPath) : null;
   if (!transactionFileExists) { return { cleanup: true }; }
-  if (!transaction || transaction.stagingRoot !== stagingRoot) {
+  if (!transaction || !await isSameDirectory(transaction.stagingRoot, stagingRoot)) {
     return {
       notice: { status: "manual-recovery", version: "unknown" },
       cleanup: false,
