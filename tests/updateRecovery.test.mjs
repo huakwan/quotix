@@ -83,6 +83,33 @@ test("startup recovery leaves the helper's acknowledged transaction untouched", 
   assert.equal(await pathExists(value.stagingRoot), true);
 });
 
+test("startup recovery preserves the transaction when backup cleanup fails", async () => {
+  const value = await fixture("complete");
+  await mkdir(value.installedApp, { recursive: true });
+  await mkdir(value.transaction.backupApp, { recursive: true });
+
+  const notices = await recoverInterruptedUpdates({
+    updatesRoot: value.updatesRoot,
+    currentBundlePath: value.installedApp,
+    currentVersion: "1.0.7",
+    removeBackup: async () => { throw new Error("backup cleanup failed"); },
+  });
+
+  assert.deepEqual(notices, []);
+  assert.equal(await pathExists(value.transaction.backupApp), true);
+  assert.equal(await pathExists(value.stagingRoot), true);
+
+  const retryNotices = await recoverInterruptedUpdates({
+    updatesRoot: value.updatesRoot,
+    currentBundlePath: value.installedApp,
+    currentVersion: "1.0.7",
+  });
+
+  assert.deepEqual(retryNotices, []);
+  assert.equal(await pathExists(value.transaction.backupApp), false);
+  assert.equal(await pathExists(value.stagingRoot), false);
+});
+
 test("startup recovery never replaces a valid manually installed newer app", async () => {
   const value = await fixture("backup-created");
   await mkdir(value.installedApp, { recursive: true });

@@ -43,6 +43,20 @@ async function waitForMarker(
   throw new UpdateError("updated_launch_timeout");
 }
 
+async function removeBackup(
+  path: string,
+  deps: InstallerHelperDeps,
+): Promise<void> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await deps.rm(path);
+      return;
+    } catch {
+      if (attempt < 2) { await deps.wait(250); }
+    }
+  }
+}
+
 export async function runInstallTransaction(
   transaction: InstallTransaction,
   deps: InstallerHelperDeps,
@@ -101,7 +115,7 @@ export async function runInstallTransaction(
   tx.phase = "complete";
   await deps.writeTransaction(tx).catch(() => undefined);
   await deps.writeResult({ status: "success", version: tx.version }).catch(() => undefined);
-  await deps.rm(tx.backupApp).catch(() => undefined);
+  await removeBackup(tx.backupApp, deps);
 }
 
 async function waitForExit(pid: number): Promise<void> {

@@ -29,6 +29,8 @@ function transaction() {
 function fakeDeps(options = {}) {
   const calls = [];
   let marker = false;
+  let backupCleanupFailures = options.backupCleanupFailures
+    ?? (options.failBackupCleanup ? Number.POSITIVE_INFINITY : 0);
   return {
     calls,
     deps: {
@@ -39,7 +41,8 @@ function fakeDeps(options = {}) {
       },
       rm: async (path) => {
         calls.push(["rm", path]);
-        if (options.failBackupCleanup && path.includes("update-backup")) {
+        if (backupCleanupFailures > 0 && path.includes("update-backup")) {
+          backupCleanupFailures -= 1;
           throw new Error("backup cleanup failed");
         }
       },
@@ -108,6 +111,19 @@ test("installer helper keeps the successful new app when backup cleanup fails", 
       && call[1].includes("update-backup")
       && call[2] === "/Applications/Quotix.app"),
     false,
+  );
+  assert.equal(
+    calls.filter(([name, path]) => name === "rm" && path.includes("update-backup")).length,
+    3,
+  );
+});
+
+test("installer helper retries a transient backup cleanup failure", async () => {
+  const { deps, calls } = fakeDeps({ backupCleanupFailures: 1 });
+  await runInstallTransaction(transaction(), deps);
+  assert.equal(
+    calls.filter(([name, path]) => name === "rm" && path.includes("update-backup")).length,
+    2,
   );
 });
 

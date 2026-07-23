@@ -17,6 +17,7 @@ export interface RecoveryOptions {
   currentBundlePath?: string;
   currentVersion: string;
   skipTransactionPath?: string;
+  removeBackup?(path: string): Promise<void>;
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -99,13 +100,25 @@ async function recoverOne(
   const installedExists = await exists(transaction.installedApp);
   const currentIsInstalled = options.currentBundlePath === transaction.installedApp;
   const currentIsTarget = currentIsInstalled && options.currentVersion === transaction.version;
+  let backupCleaned = !backupExists;
+  const removeBackup = async (): Promise<void> => {
+    try {
+      await (options.removeBackup
+        ? options.removeBackup(transaction.backupApp)
+        : rm(transaction.backupApp, { recursive: true, force: true }));
+      backupCleaned = !await exists(transaction.backupApp);
+    } catch {
+      backupCleaned = false;
+    }
+  };
   if (installedExists && currentIsTarget) {
     notice = null;
     transaction.phase = "complete";
     await writeJsonAtomic(transactionPath, transaction);
-    await rm(transaction.backupApp, { recursive: true, force: true }).catch(() => undefined);
+    await removeBackup();
   } else if (!installedExists && backupExists) {
     notice = await recordRollback(transactionPath, transaction);
+    backupCleaned = !await exists(transaction.backupApp);
   } else if (!installedExists) {
     notice = { status: "rollback-failed", version: transaction.version };
     await writeJsonAtomic(transaction.resultPath, notice).catch(() => undefined);
@@ -113,13 +126,15 @@ async function recoverOne(
     currentIsInstalled
     && (transaction.phase === "complete" || transaction.phase === "rolled-back")
   ) {
-    await rm(transaction.backupApp, { recursive: true, force: true }).catch(() => undefined);
+    await removeBackup();
   } else if (!(transaction.phase === "prepared" && !backupExists)) {
     notice = { status: "manual-recovery", version: transaction.version };
   }
   return {
     ...(notice ? { notice } : {}),
-    cleanup: notice?.status !== "rollback-failed" && notice?.status !== "manual-recovery",
+    cleanup: backupCleaned
+      && notice?.status !== "rollback-failed"
+      && notice?.status !== "manual-recovery",
   };
 }
 
