@@ -21,6 +21,8 @@ a popover with Claude, Codex, or both.
   you can compare actual usage against an even burn rate (toggle on/off)
 - Light and dark theme that follows the macOS system appearance
 - Menu-bar-only macOS app with no dock icon
+- Checks GitHub for newer stable releases and offers a user-triggered,
+  checksum- and signature-verified assisted update
 
 Defaults are `Source: Both`, `Menu bar: Claude`, `Reset time: Countdown`, and
 `Pace line: On`. When a single source is selected, the menu bar automatically
@@ -48,6 +50,28 @@ stores account credentials or raw app-server payloads.
 pnpm install
 pnpm start
 ```
+
+## Assisted updates
+
+Quotix checks for a newer stable GitHub Release shortly after launch and every
+six hours. It never downloads an archive until you press **Download**, and it
+asks again before removing quarantine from the verified staged copy and
+installing it.
+
+Because Quotix is not signed with an Apple Developer ID, this is a custom
+assisted-update flow rather than Electron's built-in auto-updater. It never
+uses `sudo` or requests an administrator password. If the running app is on a
+read-only volume or its parent directory is not writable, Quotix reveals the
+verified copy in Finder so you can replace it manually. The previous app is
+kept until the new version confirms a successful launch and is restored when
+that validation fails.
+
+Version `1.0.6` does not contain the update checker and therefore must be
+replaced manually with the first updater-enabled release. Later releases can
+use the assisted flow.
+
+Release maintainers must provision the Ed25519 update key before publishing;
+see [`docs/update-signing.md`](docs/update-signing.md).
 
 ## Scripts
 
