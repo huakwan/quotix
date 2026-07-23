@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  canActivateUpdateAction,
   quotaRowsForProvider,
   sectionsForPayload,
   showMenuBarSetting,
@@ -10,6 +11,14 @@ import {
 
 const missing = { enabled: false, loading: false, result: { ok: false, reason: "missing" }, lastGood: null };
 const quota = { updatedAt: 100, session: null, weekly: null, planDetected: false };
+
+test("download accepts only mouse clicks while other update actions allow keyboard activation", () => {
+  assert.equal(canActivateUpdateAction("download", 0), false);
+  assert.equal(canActivateUpdateAction("download", 1), true);
+  assert.equal(canActivateUpdateAction("install", 0), true);
+  assert.equal(canActivateUpdateAction("cancel", 0), true);
+  assert.equal(canActivateUpdateAction("retry", 0), true);
+});
 
 function payload(source) {
   return {
@@ -89,13 +98,17 @@ test("update presentation maps state to fixed safe actions", () => {
   assert.deepEqual(updatePresentation({ status: "idle" }), {
     visible: false, label: "", action: null, actionLabel: "", progress: null,
   });
-  assert.equal(updatePresentation({ status: "checking" }).label, "Checking for updates…");
-  assert.equal(updatePresentation({ status: "up-to-date", version: "1.0.6" }).label, "Up to date — v1.0.6");
+  assert.deepEqual(updatePresentation({ status: "checking" }), {
+    visible: false, label: "", action: null, actionLabel: "", progress: null,
+  });
+  assert.deepEqual(updatePresentation({ status: "up-to-date", version: "1.0.6" }), {
+    visible: false, label: "", action: null, actionLabel: "", progress: null,
+  });
   assert.deepEqual(updatePresentation({ status: "available", version: "1.0.7" }), {
     visible: true,
     label: "Version 1.0.7 is available",
     action: "download",
-    actionLabel: "Download",
+    actionLabel: "Update",
     progress: null,
   });
   assert.equal(updatePresentation({ status: "downloading", version: "1.0.7", progress: 150 }).progress, 100);

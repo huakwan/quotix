@@ -7,6 +7,16 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
+test("main process checks for updates every three hours", () => {
+  const main = readFileSync(join(root, "src", "main.ts"), "utf8");
+
+  assert.match(main, /const UPDATE_CHECK_INTERVAL_MS = 3 \* 60 \* 60 \* 1000;/);
+  assert.match(
+    main,
+    /setInterval\(\(\) => checkForUpdates\(false\), UPDATE_CHECK_INTERVAL_MS\)/,
+  );
+});
+
 test("build emits a separate Node-only installer helper", () => {
   const build = readFileSync(join(root, "esbuild.js"), "utf8");
   assert.match(build, /entryPoints: \["src\/update\/installerHelper\.ts"\]/);

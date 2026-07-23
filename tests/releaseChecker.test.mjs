@@ -26,10 +26,10 @@ function fixture(version = "1.0.7") {
   })}\n`);
   const signature = sign(null, manifest, privateKey).toString("base64");
   const assets = [
-    ["quotix-update.json", "https://github.com/huakwan/quotix/releases/download/v1.0.7/quotix-update.json"],
-    ["quotix-update.json.sig", "https://github.com/huakwan/quotix/releases/download/v1.0.7/quotix-update.json.sig"],
-    [`Quotix-v${version}-macos-arm64.zip`, `https://github.com/huakwan/quotix/releases/download/v1.0.7/Quotix-v${version}-macos-arm64.zip`],
-    [`Quotix-v${version}-macos-x64.zip`, `https://github.com/huakwan/quotix/releases/download/v1.0.7/Quotix-v${version}-macos-x64.zip`],
+    ["quotix-update.json", `https://github.com/huakwan/quotix/releases/download/v${version}/quotix-update.json`],
+    ["quotix-update.json.sig", `https://github.com/huakwan/quotix/releases/download/v${version}/quotix-update.json.sig`],
+    [`Quotix-v${version}-macos-arm64.zip`, `https://github.com/huakwan/quotix/releases/download/v${version}/Quotix-v${version}-macos-arm64.zip`],
+    [`Quotix-v${version}-macos-x64.zip`, `https://github.com/huakwan/quotix/releases/download/v${version}/Quotix-v${version}-macos-x64.zip`],
   ].map(([name, browser_download_url]) => ({ name, browser_download_url }));
   return {
     release: { tag_name: `v${version}`, draft: false, prerelease: false, assets },
@@ -86,6 +86,36 @@ test("release checker reports equal or older stable versions as up to date", asy
     });
     assert.deepEqual(await checker.check(), { status: "up-to-date" });
   }
+});
+
+test("release checker can force equal or older stable versions to be available for development", async () => {
+  for (const version of ["1.0.6", "1.0.5"]) {
+    const data = fixture(version);
+    const checker = new ReleaseChecker({
+      fetchImpl: fetchFor(data, []),
+      publicKey: publicPem,
+      appVersion: "1.0.6",
+      arch: "x64",
+      forceAvailable: true,
+    });
+    const result = await checker.check();
+    assert.equal(result.status, "available");
+    assert.equal(result.release.version, version);
+    assert.equal(result.release.asset.filename, `Quotix-v${version}-macos-x64.zip`);
+  }
+});
+
+test("forced development checks still reject a bad signature", async () => {
+  const data = fixture("1.0.6");
+  data.signature = Buffer.from("not a valid signature").toString("base64");
+  const checker = new ReleaseChecker({
+    fetchImpl: fetchFor(data, []),
+    publicKey: publicPem,
+    appVersion: "1.0.6",
+    arch: "arm64",
+    forceAvailable: true,
+  });
+  await assert.rejects(() => checker.check());
 });
 
 test("release checker rejects draft, prerelease, duplicate, mismatched, and untrusted assets", async () => {

@@ -64,6 +64,19 @@ test("popover wires only named assisted-update actions", () => {
   assert.match(renderer, /updateLabel\.textContent = update\.label/);
 });
 
+test("download update is mouse-only and never retains focus", () => {
+  const renderer = readFileSync(join(root, "src/ui/popoverRenderer.ts"), "utf8");
+
+  assert.match(renderer, /updateButton\.tabIndex = update\.action === "download" \? -1 : 0/);
+  assert.match(renderer, /update\.action === "download" && document\.activeElement === updateButton/);
+  assert.match(
+    renderer,
+    /addEventListener\("mousedown", \(event\) => \{\s*if \(currentUpdateAction === "download"\) \{ event\.preventDefault\(\); \}/,
+  );
+  assert.match(renderer, /canActivateUpdateAction\(currentUpdateAction, event\.detail\)/);
+  assert.match(renderer, /case "download": window\.quotix\.downloadUpdate\(\)/);
+});
+
 test("popover exposes a fixed open-at-login preference action", () => {
   const renderer = readFileSync(join(root, "src/ui/popoverRenderer.ts"), "utf8");
   const preload = readFileSync(join(root, "src/ui/preload.ts"), "utf8");

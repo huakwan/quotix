@@ -56,8 +56,35 @@ jobs:
           fi
           echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
 
+  test:
+    runs-on: macos-15
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm test
+
   build-and-package:
-    needs: prepare-release
+    needs: [prepare-release, test]
     name: Build macOS (${{ matrix.arch }})
     strategy:
       fail-fast: false
@@ -184,7 +211,7 @@ jobs:
 
           This removes macOS quarantine metadata from this copy of Quotix. Only run these commands for an app downloaded from this official release.
 
-          Starting with the first updater-enabled release, Quotix can check for new versions and download them only when you press Download. It asks again before removing quarantine from the verified staged copy and installing it. Version 1.0.6 and under must be upgraded manually once.
+          Quotix checks for new versions and downloads one only when you press Update. It asks again before removing quarantine from the verified staged copy and installing it. Versions 1.0.6 and earlier do not include the updater and must be upgraded manually.
 
           During an assisted update, Quotix keeps the previous app as a temporary backup and restores it if the new copy cannot start. If automatic installation is unavailable, Quotix shows the verified download in Finder so you can replace the app manually.
           RELEASE_BODY

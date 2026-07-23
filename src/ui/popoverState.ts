@@ -64,24 +64,25 @@ export interface UpdatePresentation {
   progress: number | null;
 }
 
+export function canActivateUpdateAction(
+  action: UpdateAction | null,
+  mouseClickCount: number,
+): boolean {
+  return action !== "download" || mouseClickCount > 0;
+}
+
 export function updatePresentation(state: UpdateViewState): UpdatePresentation {
   switch (state.status) {
     case "idle":
       return { visible: false, label: "", action: null, actionLabel: "", progress: null };
     case "checking":
-      return { visible: true, label: "Checking for updates…", action: null, actionLabel: "", progress: null };
+      return { visible: false, label: "", action: null, actionLabel: "", progress: null };
     case "up-to-date":
-      return {
-        visible: true,
-        label: `Up to date${state.version ? ` — v${state.version}` : ""}`,
-        action: null,
-        actionLabel: "",
-        progress: null,
-      };
+      return { visible: false, label: "", action: null, actionLabel: "", progress: null };
     case "available":
       return {
         visible: true, label: `Version ${state.version} is available`,
-        action: "download", actionLabel: "Download", progress: null,
+        action: "download", actionLabel: "Update", progress: null,
       };
     case "downloading":
       return {

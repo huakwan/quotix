@@ -48,7 +48,7 @@ import { stageUpdate } from "./update/stager";
 import updatePublicKey from "./update/key/quotix-update-public.pem";
 
 const REFRESH_INTERVAL_SECONDS = 2 * 60;
-const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const UPDATE_CHECK_INTERVAL_MS = 3 * 60 * 60 * 1000;
 const UPDATE_STARTUP_DELAY_MS = 30 * 1000;
 
 let tray: Tray | undefined;
@@ -240,6 +240,7 @@ app.whenReady().then(async () => {
         publicKey: updatePublicKey,
         appVersion: app.getVersion(),
         arch: updateArch,
+        forceAvailable: !app.isPackaged,
       }).check();
     },
     stage: (release, hooks, signal) => {

@@ -34,11 +34,15 @@ test("manual releases derive their tag and app archives from package.json", () =
   );
   const buildJobStart = workflow.indexOf("  build-and-package:");
   const uploadJobStart = workflow.indexOf("  upload-to-release:");
+  const testJobStart = workflow.indexOf("  test:");
 
+  assert.notEqual(testJobStart, -1, "workflow should contain a test job");
   assert.notEqual(buildJobStart, -1, "workflow should contain a build job");
   assert.notEqual(uploadJobStart, -1, "workflow should contain an upload job");
+  assert.ok(testJobStart < buildJobStart, "test job should precede the build job");
   assert.ok(buildJobStart < uploadJobStart, "build job should precede upload job");
 
+  const testJob = workflow.slice(testJobStart, buildJobStart);
   const buildJob = workflow.slice(buildJobStart, uploadJobStart);
   const pnpmSetupIndex = buildJob.indexOf("uses: pnpm/action-setup@v5");
   const nodeSetupIndex = buildJob.indexOf("uses: actions/setup-node@v6");
@@ -58,12 +62,14 @@ test("manual releases derive their tag and app archives from package.json", () =
     "pnpm should be installed before setup-node configures its cache",
   );
   assert.match(workflow, /persist-credentials: false/);
+  assert.match(testJob, /runs-on: macos-15/);
+  assert.match(testJob, /- name: Run tests\s*\n\s+run: pnpm test/);
   assert.match(workflow, /lipo -archs/);
   assert.match(workflow, /PlistBuddy -c 'Print :CFBundleShortVersionString'/);
   assert.match(workflow, /build-info-\$\{arch\}\.json/);
   assert.match(workflow, /uses: actions\/upload-artifact@v6/);
   assert.match(workflow, /retention-days: 1/);
-  assert.match(workflow, /build-and-package:[\s\S]*?needs: prepare-release/);
+  assert.match(workflow, /build-and-package:[\s\S]*?needs: \[prepare-release, test\]/);
   assert.match(workflow, /upload-to-release:\s*\n\s+needs: \[prepare-release, build-and-package\]/);
   assert.match(workflow, /upload-to-release:[\s\S]*?permissions:\s*\n\s+contents: write/);
   assert.match(workflow, /uses: actions\/download-artifact@v7/);
@@ -85,57 +91,37 @@ test("manual releases derive their tag and app archives from package.json", () =
     "release-body.md heredoc should be present and terminated",
   );
   const releaseBody = releaseBodyMatch[1];
-  const englishMarker = "**English**";
-  const thaiMarker = "**ภาษาไทย**";
-  const englishIndex = releaseBody.indexOf(englishMarker);
-  const thaiIndex = releaseBody.indexOf(thaiMarker);
-
-  assert.match(releaseBody, /macOS blocks the app\? \/ macOS ไม่ยอมเปิดแอป\?/);
-  assert.notEqual(
-    englishIndex,
-    -1,
-    "release body should contain an English section",
-  );
-  assert.notEqual(thaiIndex, -1, "release body should contain a Thai section");
-  assert.ok(
-    englishIndex < thaiIndex,
-    "English section should occur before Thai section",
-  );
-
-  const englishSection = releaseBody.slice(
-    englishIndex + englishMarker.length,
-    thaiIndex,
-  );
-  const thaiSection = releaseBody.slice(thaiIndex + thaiMarker.length);
   const quarantineCommand =
     "xattr -dr com.apple.quarantine /Applications/Quotix.app";
   const openCommand = "open /Applications/Quotix.app";
 
-  for (const [language, section] of [
-    ["English", englishSection],
-    ["Thai", thaiSection],
-  ]) {
-    assert.ok(
-      section.includes(quarantineCommand),
-      `${language} section should include xattr command`,
-    );
-    assert.ok(
-      section.includes(openCommand),
-      `${language} section should include open command`,
-    );
-  }
+  assert.match(releaseBody, /### macOS blocks the app\?/);
+  assert.equal(
+    releaseBody.match(/xattr -dr com\.apple\.quarantine \/Applications\/Quotix\.app/g)?.length,
+    1,
+  );
+  assert.equal(
+    releaseBody.match(/open \/Applications\/Quotix\.app/g)?.length,
+    1,
+  );
+  assert.ok(releaseBody.includes(quarantineCommand));
+  assert.ok(releaseBody.includes(openCommand));
   assert.ok(
-    englishSection.includes(
+    releaseBody.includes(
       "Only run these commands for an app downloaded from this official release.",
     ),
-    "English section should restrict commands to apps from the official release",
+    "release body should restrict commands to apps from the official release",
   );
-  assert.ok(
-    thaiSection.includes(
-      "โปรดรันเฉพาะกับแอปที่ดาวน์โหลดจาก Release อย่างเป็นทางการนี้เท่านั้น",
-    ),
-    "Thai section should restrict commands to apps from the official release",
+  assert.match(
+    releaseBody,
+    /Quotix checks for new versions and downloads one only when you press Update\./,
   );
+  assert.match(
+    releaseBody,
+    /Versions 1\.0\.6 and earlier do not include the updater and must be upgraded manually\./,
+  );
+  assert.doesNotMatch(releaseBody, /Starting with the first updater-enabled release/);
+  assert.doesNotMatch(releaseBody, /[\u0E00-\u0E7F]/);
 
   const releaseCreationMatch = workflow.match(
     /(release_id="\$\(gh api --method POST "repos\/\$\{GH_REPO\}\/releases" \\\n[\s\S]*?\n\s+--jq '\.id'\)")/,

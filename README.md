@@ -19,15 +19,16 @@ a popover with Claude, Codex, or both.
 - Live reset countdown or wall-clock reset time
 - Pace line marker on each bar, showing how much of the window has elapsed so
   you can compare actual usage against an even burn rate (toggle on/off)
+- Optional `Open at login` setting, synchronized with the macOS login item
 - Light and dark theme that follows the macOS system appearance
 - Menu-bar-only macOS app with no dock icon
 - Checks GitHub for newer stable releases and offers a user-triggered,
   checksum- and signature-verified assisted update
 
-Defaults are `Source: Both`, `Menu bar: Claude`, `Reset time: Countdown`, and
-`Pace line: On`. When a single source is selected, the menu bar automatically
-follows that source. Returning to Both restores the last explicit menu-bar
-choice.
+Defaults are `Source: Both`, `Menu bar: Claude`, `Reset time: Countdown`,
+`Pace line: On`, and `Open at login: Off`. When a single source is selected,
+the menu bar automatically follows that source. Returning to Both restores the
+last explicit menu-bar choice.
 
 ## Requirements
 
@@ -51,10 +52,15 @@ pnpm install
 pnpm start
 ```
 
+Development runs force the latest stable release into the available-update
+flow, even when that release has the same or an older version. This makes the
+download, verification, and Finder-assisted installation UI testable locally.
+Packaged builds always use the normal newer-version check.
+
 ## Assisted updates
 
 Quotix checks for a newer stable GitHub Release shortly after launch and every
-six hours. It never downloads an archive until you press **Download**, and it
+three hours. It never downloads an archive until you press **Update**, and it
 asks again before removing quarantine from the verified staged copy and
 installing it.
 
@@ -93,7 +99,8 @@ see [`docs/update-signing.md`](docs/update-signing.md).
 - `src/quota/claude/` reads Keychain credentials and Anthropic OAuth usage.
 - `src/quota/codex/` discovers Codex, manages app-server JSON-RPC, and maps
   account rate limits.
-- `src/preferences.ts` validates and persists source/menu/reset/pace-line settings.
+- `src/preferences.ts` validates and persists source, menu-bar, reset,
+  pace-line, and open-at-login settings.
 - `src/main.ts` composes Electron, providers, tray, popover, and IPC.
 
 Only successful normalized quota data is cached. Claude and Codex caches are

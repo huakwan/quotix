@@ -1,4 +1,5 @@
 import {
+  canActivateUpdateAction,
   quotaRowsForProvider,
   sectionsForPayload,
   showMenuBarSetting,
@@ -188,6 +189,10 @@ function draw(): void {
   updateButton.textContent = update.actionLabel;
   updateButton.classList.toggle("hidden", update.action === null);
   updateButton.disabled = update.action === null;
+  updateButton.tabIndex = update.action === "download" ? -1 : 0;
+  if (update.action === "download" && document.activeElement === updateButton) {
+    updateButton.blur();
+  }
   updateProgress.classList.toggle("hidden", update.progress === null);
   updateProgress.value = update.progress ?? 0;
 }
@@ -206,7 +211,12 @@ onSegment("reset-mode", (value) => window.quotix.setResetMode(value as ResetMode
 onSegment("pace-mode", (value) => window.quotix.setShowPaceLine(value === "on"));
 onSegment("login-mode", (value) => window.quotix.setOpenAtLogin(value === "on"));
 document.getElementById("refresh")!.addEventListener("click", () => window.quotix.refresh());
-document.getElementById("update-action")!.addEventListener("click", () => {
+const updateActionButton = document.getElementById("update-action")!;
+updateActionButton.addEventListener("mousedown", (event) => {
+  if (currentUpdateAction === "download") { event.preventDefault(); }
+});
+updateActionButton.addEventListener("click", (event) => {
+  if (!canActivateUpdateAction(currentUpdateAction, event.detail)) { return; }
   switch (currentUpdateAction) {
     case "download": window.quotix.downloadUpdate(); break;
     case "cancel": window.quotix.cancelUpdate(); break;
