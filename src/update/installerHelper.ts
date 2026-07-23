@@ -2,7 +2,11 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { UpdateError } from "./model";
-import { parseInstallTransaction, type InstallTransaction } from "./transaction";
+import {
+  parseInstallTransaction,
+  writeJsonAtomic,
+  type InstallTransaction,
+} from "./transaction";
 
 interface LaunchedProcess {
   pid?: number;
@@ -46,9 +50,11 @@ export async function runInstallTransaction(
   const tx = parseInstallTransaction(transaction);
   let backupCreated = false;
   let newInstalled = false;
+  let originalExited = false;
   let child: LaunchedProcess | undefined;
   try {
     await deps.waitForExit(tx.originalPid);
+    originalExited = true;
     await deps.rename(tx.installedApp, tx.backupApp);
     backupCreated = true;
     tx.phase = "backup-created";
@@ -64,27 +70,38 @@ export async function runInstallTransaction(
     tx.phase = "launching";
     await deps.writeTransaction(tx);
     await waitForMarker(tx, child, deps);
-    await deps.rm(tx.backupApp);
-    tx.phase = "complete";
-    await deps.writeTransaction(tx);
-    await deps.writeResult({ status: "success", version: tx.version });
   } catch (error) {
-    child?.kill();
+    if (child) {
+      child.kill();
+      if (child.pid) {
+        await deps.waitForExit(child.pid).catch(() => undefined);
+      }
+    }
     try {
       if (newInstalled) { await deps.rm(tx.installedApp); }
       if (backupCreated) {
         await deps.rename(tx.backupApp, tx.installedApp);
-        await deps.launch(executablePath(tx.installedApp), ["--quotix-update-rollback"]);
       }
       tx.phase = "rolled-back";
-      await deps.writeTransaction(tx);
-      await deps.writeResult({ status: "rolled-back", version: tx.version });
-    } catch {
-      await deps.writeResult({ status: "rollback-failed", version: tx.version });
+      await deps.writeTransaction(tx).catch(() => undefined);
+      await deps.writeResult({ status: "rolled-back", version: tx.version }).catch(() => undefined);
+      if (originalExited) {
+        await deps.launch(executablePath(tx.installedApp), ["--quotix-update-rollback"]);
+      }
+    } catch (rollbackError) {
+      await deps.writeResult({
+        status: "rollback-failed",
+        version: tx.version,
+        error: rollbackError instanceof Error ? rollbackError.message : "unknown",
+      }).catch(() => undefined);
     }
     if (error instanceof Error) { throw error; }
     throw new UpdateError("install_failed");
   }
+  tx.phase = "complete";
+  await deps.writeTransaction(tx).catch(() => undefined);
+  await deps.writeResult({ status: "success", version: tx.version }).catch(() => undefined);
+  await deps.rm(tx.backupApp).catch(() => undefined);
 }
 
 async function waitForExit(pid: number): Promise<void> {
@@ -99,9 +116,21 @@ async function waitForExit(pid: number): Promise<void> {
   }
 }
 
+export function appLaunchEnvironment(
+  environment: NodeJS.ProcessEnv,
+): NodeJS.ProcessEnv {
+  const sanitized = { ...environment };
+  delete sanitized.ELECTRON_RUN_AS_NODE;
+  return sanitized;
+}
+
 async function launch(path: string, args: string[]): Promise<ChildProcess> {
   return new Promise((resolve, reject) => {
-    const child = spawn(path, args, { detached: true, stdio: "ignore" });
+    const child = spawn(path, args, {
+      detached: true,
+      stdio: "ignore",
+      env: appLaunchEnvironment(process.env),
+    });
     child.once("error", reject);
     child.once("spawn", () => {
       child.removeListener("error", reject);
@@ -115,12 +144,15 @@ async function main(): Promise<void> {
   const transactionPath = process.argv[2];
   if (!transactionPath) { throw new UpdateError("transaction_invalid"); }
   const tx = parseInstallTransaction(JSON.parse(await readFile(transactionPath, "utf8")));
+  if (join(tx.stagingRoot, "install-transaction.json") !== transactionPath) {
+    throw new UpdateError("transaction_invalid");
+  }
   const deps: InstallerHelperDeps = {
     waitForExit,
     rename,
     rm: (path) => rm(path, { recursive: true, force: true }),
-    writeTransaction: (value) => writeFile(transactionPath, JSON.stringify(value), { mode: 0o600 }),
-    writeResult: (value) => writeFile(tx.resultPath, JSON.stringify(value), { mode: 0o600 }),
+    writeTransaction: (value) => writeJsonAtomic(transactionPath, value),
+    writeResult: (value) => writeJsonAtomic(tx.resultPath, value),
     launch,
     readMarker: async () => {
       try { return (await readFile(tx.markerPath, "utf8")).trim(); } catch { return null; }

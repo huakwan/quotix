@@ -6,9 +6,13 @@ import yauzl, { type Entry, type ZipFile } from "yauzl";
 import { UpdateError } from "./model";
 
 const execFileAsync = promisify(execFile);
+const MAX_ARCHIVE_ENTRIES = 50_000;
+const MAX_EXPANDED_BYTES = 1024 * 1024 * 1024;
 
 export interface ArchiveEntryInfo {
   name: string;
+  uncompressedSize?: number;
+  kind?: "file" | "directory" | "symlink" | "special";
   symlinkTarget?: string;
 }
 
@@ -18,8 +22,20 @@ function contained(root: string, candidate: string): boolean {
 }
 
 export function validateArchiveEntries(entries: ArchiveEntryInfo[]): void {
-  if (entries.length === 0) { throw new UpdateError("archive_unsafe"); }
+  if (entries.length === 0 || entries.length > MAX_ARCHIVE_ENTRIES) {
+    throw new UpdateError("archive_unsafe");
+  }
+  let expandedBytes = 0;
   for (const entry of entries) {
+    if (
+      entry.kind === "special"
+      || !Number.isSafeInteger(entry.uncompressedSize ?? 0)
+      || (entry.uncompressedSize ?? 0) < 0
+    ) {
+      throw new UpdateError("archive_unsafe");
+    }
+    expandedBytes += entry.uncompressedSize ?? 0;
+    if (expandedBytes > MAX_EXPANDED_BYTES) { throw new UpdateError("archive_unsafe"); }
     const name = entry.name;
     if (
       !name
@@ -95,9 +111,19 @@ export async function inspectArchive(zipPath: string): Promise<ArchiveEntryInfo[
     zip.on("entry", async (entry: Entry) => {
       try {
         const mode = (entry.externalFileAttributes >>> 16) & 0xffff;
-        const isSymlink = (mode & 0o170000) === 0o120000;
+        const fileType = mode & 0o170000;
+        const isSymlink = fileType === 0o120000;
+        const kind: ArchiveEntryInfo["kind"] = isSymlink
+          ? "symlink"
+          : fileType === 0o040000 || entry.fileName.endsWith("/")
+            ? "directory"
+            : fileType === 0 || fileType === 0o100000
+              ? "file"
+              : "special";
         entries.push({
           name: entry.fileName,
+          uncompressedSize: entry.uncompressedSize,
+          kind,
           ...(isSymlink ? { symlinkTarget: (await entryStream(zip, entry)).toString("utf8") } : {}),
         });
         zip.readEntry();

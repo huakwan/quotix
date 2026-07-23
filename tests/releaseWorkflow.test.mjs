@@ -173,4 +173,6 @@ test("manual releases derive their tag and app archives from package.json", () =
   assert.match(workflow, /-z "\$remaining_release_id"/);
   assert.match(workflow, /gh api --method DELETE .*git\/refs\/tags/);
   assert.match(workflow, /Quotix-.*macos-.*\.zip/);
+  assert.match(workflow, /ditto -c -k --keepParent/);
+  assert.doesNotMatch(workflow, /--sequesterRsrc/);
 });

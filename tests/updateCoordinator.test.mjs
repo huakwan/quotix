@@ -91,3 +91,40 @@ test("update coordinator keeps a verified update ready when install is cancelled
   await coordinator.install();
   assert.deepEqual(coordinator.view(), { status: "ready", version: "1.0.7" });
 });
+
+test("update coordinator enters installing before awaiting preparation", async () => {
+  let finishInstall;
+  const coordinator = new UpdateCoordinator({
+    check: async () => ({ status: "available", release }),
+    stage: async () => ({
+      version: "1.0.7", stagingRoot: "/tmp/update", appPath: "/tmp/update/Quotix.app",
+    }),
+    install: () => new Promise((resolve) => { finishInstall = resolve; }),
+    reveal: async () => undefined,
+  });
+  await coordinator.check(true);
+  await coordinator.download();
+  const pending = coordinator.install();
+  assert.deepEqual(coordinator.view(), { status: "installing", version: "1.0.7" });
+  await assert.rejects(() => coordinator.install(), { code: "update_action_invalid" });
+  finishInstall("installing");
+  await pending;
+});
+
+test("a new successful check cleans an abandoned verified download", async () => {
+  const cleaned = [];
+  const coordinator = new UpdateCoordinator({
+    currentVersion: "1.0.7",
+    check: async () => ({ status: "available", release }),
+    stage: async () => ({
+      version: "1.0.7", stagingRoot: "/tmp/update", appPath: "/tmp/update/Quotix.app",
+    }),
+    install: async () => "installing",
+    reveal: async () => undefined,
+    cleanup: async (update) => { cleaned.push(update.stagingRoot); },
+  });
+  await coordinator.check(true);
+  await coordinator.download();
+  await coordinator.check(true);
+  assert.deepEqual(cleaned, ["/tmp/update"]);
+});

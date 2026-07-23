@@ -1,11 +1,15 @@
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { copyFile, realpath, writeFile } from "node:fs/promises";
+import { copyFile, readFile, realpath, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { isContainedPath, resolveInstalledBundle } from "./installPaths";
 import { UpdateError, type VerifiedUpdate } from "./model";
-import type { InstallTransaction } from "./transaction";
+import {
+  parseInstallTransaction,
+  writeJsonAtomic,
+  type InstallTransaction,
+} from "./transaction";
 
 const execFileAsync = promisify(execFile);
 
@@ -53,12 +57,14 @@ export interface InstallUpdateOptions {
   helperSource: string;
   originalPid: number;
   confirm(mode: "automatic" | "finder"): Promise<boolean>;
+  quarantineRealpath?(path: string): Promise<string>;
+  quarantineExecFile?(executable: string, args: string[]): Promise<unknown>;
   reveal(path: string): void;
   spawnHelper(
     executable: string,
     args: string[],
     options: { env: NodeJS.ProcessEnv; detached: true; stdio: "ignore" },
-  ): { unref(): void };
+  ): Promise<{ unref(): void }>;
   quit(): void;
 }
 
@@ -67,11 +73,22 @@ export async function installVerifiedUpdate(
 ): Promise<"installing" | "fallback"> {
   const location = await resolveInstalledBundle(options.execPath);
   const mode = location.eligible ? "automatic" : "finder";
-  const consented = await removeVerifiedQuarantine({
-    stagingRoot: options.update.stagingRoot,
-    appPath: options.update.appPath,
-    confirm: () => options.confirm(mode),
-  });
+  let consented: boolean;
+  try {
+    consented = await removeVerifiedQuarantine({
+      stagingRoot: options.update.stagingRoot,
+      appPath: options.update.appPath,
+      confirm: () => options.confirm(mode),
+      realpath: options.quarantineRealpath,
+      execFile: options.quarantineExecFile,
+    });
+  } catch (error) {
+    if (error instanceof UpdateError && error.code === "quarantine_removal_failed") {
+      options.reveal(options.update.appPath);
+      return "fallback";
+    }
+    throw error;
+  }
   if (!consented) { throw new UpdateError("install_cancelled"); }
   if (!location.eligible) {
     options.reveal(options.update.appPath);
@@ -84,6 +101,7 @@ export async function installVerifiedUpdate(
   const transaction: InstallTransaction = {
     schemaVersion: 1,
     version: options.update.version,
+    stagingRoot: options.update.stagingRoot,
     installedApp: location.bundlePath,
     stagedApp: options.update.appPath,
     backupApp: `${location.bundlePath}.update-backup-${token.slice(0, 12)}`,
@@ -94,8 +112,8 @@ export async function installVerifiedUpdate(
     phase: "prepared",
   };
   await copyFile(options.helperSource, helperPath);
-  await writeFile(transactionPath, JSON.stringify(transaction), { mode: 0o600 });
-  const helper = options.spawnHelper(options.execPath, [helperPath, transactionPath], {
+  await writeJsonAtomic(transactionPath, transaction);
+  const helper = await options.spawnHelper(options.execPath, [helperPath, transactionPath], {
     env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
     detached: true,
     stdio: "ignore",
@@ -112,19 +130,45 @@ function argumentValue(argv: string[], name: string): string | undefined {
 export async function acknowledgeUpdatedLaunch(
   argv: string[],
   userDataDir: string,
-): Promise<void> {
+  currentVersion: string,
+): Promise<{ markerPath: string; transactionPath: string } | null> {
   const token = argumentValue(argv, "--quotix-update-token");
   const marker = argumentValue(argv, "--quotix-update-marker");
-  if (!token && !marker) { return; }
+  if (!token && !marker) { return null; }
   const updatesRoot = join(userDataDir, "updates");
+  const stagingRoot = marker ? dirname(marker) : "";
+  const transactionPath = join(stagingRoot, "install-transaction.json");
   if (
     !token
     || !marker
     || !/^[a-f0-9]{64}$/.test(token)
     || !isContainedPath(updatesRoot, marker)
-    || dirname(marker) === updatesRoot
+    || stagingRoot === updatesRoot
+  ) {
+    throw new UpdateError("launch_acknowledgement_invalid");
+  }
+  let transaction: InstallTransaction;
+  try {
+    const [canonicalUpdates, canonicalStaging] = await Promise.all([
+      realpath(updatesRoot),
+      realpath(stagingRoot),
+    ]);
+    if (!isContainedPath(canonicalUpdates, canonicalStaging)) {
+      throw new Error("outside updates root");
+    }
+    transaction = parseInstallTransaction(JSON.parse(await readFile(transactionPath, "utf8")));
+  } catch {
+    throw new UpdateError("launch_acknowledgement_invalid");
+  }
+  if (
+    transaction.stagingRoot !== stagingRoot
+    || transaction.markerPath !== marker
+    || transaction.token !== token
+    || transaction.version !== currentVersion
+    || !["new-installed", "launching"].includes(transaction.phase)
   ) {
     throw new UpdateError("launch_acknowledgement_invalid");
   }
   await writeFile(marker, token, { mode: 0o600, flag: "wx" });
+  return { markerPath: marker, transactionPath };
 }

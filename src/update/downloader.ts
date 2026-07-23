@@ -106,7 +106,17 @@ export async function downloadAsset(options: DownloadOptions): Promise<string> {
       received += value.byteLength;
       if (received > options.size) { throw new UpdateError("download_too_large"); }
       hash.update(value);
-      await handle.write(value);
+      let offset = 0;
+      while (offset < value.byteLength) {
+        const { bytesWritten } = await handle.write(
+          value,
+          offset,
+          value.byteLength - offset,
+          null,
+        );
+        if (bytesWritten <= 0) { throw new UpdateError("download_failed"); }
+        offset += bytesWritten;
+      }
       options.onProgress?.(Math.min(100, (received / options.size) * 100));
     }
     if (received !== options.size) { throw new UpdateError("download_size_mismatch"); }

@@ -4,6 +4,7 @@ declare module "yauzl" {
   export interface Entry {
     fileName: string;
     externalFileAttributes: number;
+    uncompressedSize: number;
   }
 
   export interface ZipFile {

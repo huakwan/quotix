@@ -44,9 +44,21 @@ async function boundedBytes(response: Response, errorCode: string): Promise<Buff
   if (Number.isFinite(declared) && declared > MAX_METADATA_BYTES) {
     throw new UpdateError(errorCode);
   }
-  const bytes = Buffer.from(await response.arrayBuffer());
-  if (bytes.length > MAX_METADATA_BYTES) { throw new UpdateError(errorCode); }
-  return bytes;
+  if (!response.body) { throw new UpdateError(errorCode); }
+  const reader = response.body.getReader();
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) { break; }
+    total += value.byteLength;
+    if (total > MAX_METADATA_BYTES) {
+      await reader.cancel();
+      throw new UpdateError(errorCode);
+    }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks, total);
 }
 
 function trustedRedirect(value: string | URL): URL {

@@ -21,6 +21,7 @@ export interface UpdateCoordinatorDeps {
   ): Promise<VerifiedUpdate>;
   install(update: VerifiedUpdate): Promise<"installing" | "fallback">;
   reveal(update: VerifiedUpdate): Promise<void>;
+  cleanup?(update: VerifiedUpdate): Promise<void>;
 }
 
 export class UpdateCoordinator {
@@ -56,7 +57,11 @@ export class UpdateCoordinator {
     this.setState({ status: "checking" });
     try {
       const result = await this.deps.check();
+      const previousVerified = this.verified;
       this.verified = undefined;
+      if (previousVerified) {
+        await this.deps.cleanup?.(previousVerified).catch(() => undefined);
+      }
       if (result.status === "up-to-date") {
         this.release = undefined;
         this.setState({ status: "up-to-date", version: this.deps.currentVersion ?? "" });
@@ -112,9 +117,12 @@ export class UpdateCoordinator {
       throw new UpdateError("update_action_invalid");
     }
     const update = this.verified;
+    this.setState({ status: "installing", version: update.version });
     try {
       const result = await this.deps.install(update);
-      this.setState({ status: result, version: update.version });
+      if (result === "fallback") {
+        this.setState({ status: "fallback", version: update.version });
+      }
     } catch (error) {
       this.setState(error instanceof UpdateError && error.code === "install_cancelled"
         ? { status: "ready", version: update.version }

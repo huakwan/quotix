@@ -29,8 +29,7 @@ export function validateBundleMetadata(
     info.CFBundleIdentifier !== "com.huakwan.quotix"
     || info.CFBundleName !== "Quotix"
     || info.CFBundleShortVersionString !== expected.version
-    || typeof info.CFBundleExecutable !== "string"
-    || !/^[A-Za-z0-9._-]+$/.test(info.CFBundleExecutable)
+    || info.CFBundleExecutable !== "Quotix"
     || architectures.length !== 1
     || architectures[0] !== expectedArchitecture
     || nestedApps.length !== 0

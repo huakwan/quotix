@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { removeVerifiedQuarantine } from "../out/src/update/installer.js";
+import { mkdir, mkdtemp, realpath, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  acknowledgeUpdatedLaunch,
+  installVerifiedUpdate,
+  removeVerifiedQuarantine,
+} from "../out/src/update/installer.js";
 
 test("installer never removes quarantine without consent", async () => {
   const calls = [];
@@ -45,4 +52,86 @@ test("installer rejects changed or prefix-confused staging paths", async () => {
       execFile: async () => undefined,
     }), { code: "install_path_changed" });
   }
+});
+
+test("installer reveals the verified app when quarantine removal fails", async () => {
+  const root = await mkdtemp(join(tmpdir(), "quotix-install-"));
+  const installedApp = join(root, "Applications", "Quotix.app");
+  const stagedApp = join(root, "updates", "update-1", "Quotix.app");
+  await mkdir(join(installedApp, "Contents", "MacOS"), { recursive: true });
+  await mkdir(stagedApp, { recursive: true });
+  const revealed = [];
+  const result = await installVerifiedUpdate({
+    update: { version: "1.0.7", stagingRoot: join(root, "updates", "update-1"), appPath: stagedApp },
+    execPath: join(installedApp, "Contents", "MacOS", "Quotix"),
+    helperSource: join(root, "helper.js"),
+    originalPid: 123,
+    confirm: async () => true,
+    quarantineRealpath: async (path) => path,
+    quarantineExecFile: async () => { throw new Error("xattr denied"); },
+    reveal: (path) => revealed.push(path),
+    spawnHelper: () => { throw new Error("must not spawn"); },
+    quit: () => { throw new Error("must not quit"); },
+  });
+  assert.equal(result, "fallback");
+  assert.deepEqual(revealed, [stagedApp]);
+});
+
+test("updated launch acknowledgement validates the transaction before creating its marker", async () => {
+  const root = await mkdtemp(join(tmpdir(), "quotix-ack-"));
+  const updatesRoot = join(root, "updates");
+  const stagingRoot = join(updatesRoot, "update-1");
+  const token = "c".repeat(64);
+  const markerPath = join(stagingRoot, "launch-success");
+  const installedApp = join(root, "Applications", "Quotix.app");
+  const transaction = {
+    schemaVersion: 1,
+    version: "1.0.7",
+    stagingRoot,
+    installedApp,
+    stagedApp: join(stagingRoot, "Quotix.app"),
+    backupApp: `${installedApp}.update-backup-${token.slice(0, 12)}`,
+    markerPath,
+    resultPath: join(stagingRoot, "install-result.json"),
+    token,
+    originalPid: 123,
+    phase: "launching",
+  };
+  await mkdir(stagingRoot, { recursive: true });
+  await import("node:fs/promises").then(({ writeFile }) =>
+    writeFile(join(stagingRoot, "install-transaction.json"), JSON.stringify(transaction)));
+  const acknowledged = await acknowledgeUpdatedLaunch([
+    `--quotix-update-token=${token}`,
+    `--quotix-update-marker=${markerPath}`,
+  ], root, "1.0.7");
+  assert.equal(acknowledged.transactionPath, join(stagingRoot, "install-transaction.json"));
+  await assert.rejects(() => acknowledgeUpdatedLaunch([
+    `--quotix-update-token=${token}`,
+    `--quotix-update-marker=${markerPath}`,
+  ], root, "9.9.9"), { code: "launch_acknowledgement_invalid" });
+});
+
+test("installer does not quit until helper startup is confirmed", async () => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), "quotix-helper-spawn-")));
+  const installedApp = join(root, "Applications", "Quotix.app");
+  const stagingRoot = join(root, "updates", "update-1");
+  const stagedApp = join(stagingRoot, "Quotix.app");
+  const helperSource = join(root, "installerHelper.js");
+  await mkdir(join(installedApp, "Contents", "MacOS"), { recursive: true });
+  await mkdir(stagedApp, { recursive: true });
+  await writeFile(helperSource, "helper");
+  let quit = false;
+  await assert.rejects(() => installVerifiedUpdate({
+    update: { version: "1.0.7", stagingRoot, appPath: stagedApp },
+    execPath: join(installedApp, "Contents", "MacOS", "Quotix"),
+    helperSource,
+    originalPid: 123,
+    confirm: async () => true,
+    quarantineRealpath: async (path) => path,
+    quarantineExecFile: async () => undefined,
+    reveal: () => undefined,
+    spawnHelper: async () => { throw new Error("spawn failed"); },
+    quit: () => { quit = true; },
+  }), /spawn failed/);
+  assert.equal(quit, false);
 });

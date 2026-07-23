@@ -100,7 +100,7 @@ export function updatePresentation(state: UpdateViewState): UpdatePresentation {
       return { visible: true, label: "Installing update…", action: null, actionLabel: "", progress: null };
     case "fallback":
       return {
-        visible: true, label: "Manual replacement is required",
+        visible: true, label: "Open the verified download in Finder; right-click Open if macOS blocks it",
         action: "reveal", actionLabel: "Show in Finder", progress: null,
       };
     case "error":
