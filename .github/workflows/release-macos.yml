@@ -154,7 +154,7 @@ jobs:
             --assets-dir release-assets \
             --output-dir release-assets \
             --tag "$RELEASE_TAG" \
-            --public-key src/update/quotix-update-public.pem
+            --public-key src/update/key/quotix-update-public.pem
 
       - name: Create release with app archives
         env:

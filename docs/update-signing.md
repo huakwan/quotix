@@ -18,7 +18,7 @@ openssl pkey -in quotix-update-private.pem -pubout -out quotix-update-public.pem
 
 Then:
 
-1. Copy the public key to `src/update/quotix-update-public.pem` and commit that
+1. Copy the public key to `src/update/key/quotix-update-public.pem` and commit that
    public file.
 2. In GitHub repository settings, create the Actions secret
    `UPDATE_SIGNING_PRIVATE_KEY` and paste the complete private PKCS#8 PEM.

@@ -24,7 +24,7 @@ test("production private update keys are absent from package inputs", () => {
   assert.match(files, /dist/);
   assert.doesNotMatch(files, /private.*(?:pem|key)/i);
   const publicKey = createPublicKey(
-    readFileSync(join(root, "src", "update", "quotix-update-public.pem"), "utf8"),
+    readFileSync(join(root, "src", "update", "key", "quotix-update-public.pem"), "utf8"),
   );
   assert.equal(publicKey.asymmetricKeyType, "ed25519");
 });
