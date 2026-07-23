@@ -111,20 +111,32 @@ test("update coordinator enters installing before awaiting preparation", async (
   await pending;
 });
 
-test("a new successful check cleans an abandoned verified download", async () => {
+test("update checks stay blocked while a verified download awaits installation", async () => {
+  let checkCalls = 0;
   const cleaned = [];
   const coordinator = new UpdateCoordinator({
     currentVersion: "1.0.7",
-    check: async () => ({ status: "available", release }),
+    check: async () => {
+      checkCalls += 1;
+      return { status: "available", release };
+    },
     stage: async () => ({
       version: "1.0.7", stagingRoot: "/tmp/update", appPath: "/tmp/update/Quotix.app",
     }),
-    install: async () => "installing",
+    install: async () => "fallback",
     reveal: async () => undefined,
     cleanup: async (update) => { cleaned.push(update.stagingRoot); },
   });
   await coordinator.check(true);
   await coordinator.download();
-  await coordinator.check(true);
-  assert.deepEqual(cleaned, ["/tmp/update"]);
+  await assert.rejects(() => coordinator.check(true), { code: "update_action_invalid" });
+  assert.equal(checkCalls, 1);
+  assert.deepEqual(cleaned, []);
+  assert.deepEqual(coordinator.view(), { status: "ready", version: "1.0.7" });
+
+  await coordinator.install();
+  await assert.rejects(() => coordinator.check(false), { code: "update_action_invalid" });
+  assert.equal(checkCalls, 1);
+  assert.deepEqual(cleaned, []);
+  assert.deepEqual(coordinator.view(), { status: "fallback", version: "1.0.7" });
 });

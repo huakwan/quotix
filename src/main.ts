@@ -140,7 +140,10 @@ function showAbout(): void {
 }
 
 function registerIpc(): void {
-  ipcMain.on("quota:refresh", () => poll(true));
+  ipcMain.on("quota:refresh", () => {
+    poll(true);
+    checkForUpdates(true);
+  });
   ipcMain.on("quota:quit", () => app.quit());
   ipcMain.on("about:open", (event) => {
     if (popover && event.sender === popover.webContents) { showAbout(); }

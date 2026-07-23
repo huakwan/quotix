@@ -17,6 +17,15 @@ test("main process checks for updates every three hours", () => {
   );
 });
 
+test("manual quota refresh also checks for app updates", () => {
+  const main = readFileSync(join(root, "src", "main.ts"), "utf8");
+
+  assert.match(
+    main,
+    /ipcMain\.on\("quota:refresh", \(\) => \{\s*poll\(true\);\s*checkForUpdates\(true\);\s*\}\)/,
+  );
+});
+
 test("build emits a separate Node-only installer helper", () => {
   const build = readFileSync(join(root, "esbuild.js"), "utf8");
   assert.match(build, /entryPoints: \["src\/update\/installerHelper\.ts"\]/);

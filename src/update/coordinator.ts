@@ -50,7 +50,10 @@ export class UpdateCoordinator {
   }
 
   async check(manual: boolean): Promise<void> {
-    if (["checking", "downloading", "verifying", "installing"].includes(this.state.status)) {
+    if (
+      ["checking", "downloading", "verifying", "ready", "installing", "fallback"]
+        .includes(this.state.status)
+    ) {
       throw new UpdateError("update_action_invalid");
     }
     const previous = this.state;
