@@ -15,7 +15,6 @@ test("manual releases derive their tag and app archives from package.json", () =
   assert.match(workflow, /on:\s*\n\s+workflow_dispatch:/);
   assert.doesNotMatch(workflow, /types: \[published\]/);
   assert.match(workflow, /^permissions:\s*\n\s+contents: read$/m);
-  assert.match(workflow, /prepare-release:\s*\n\s+outputs:\s*\n\s+release_tag:/);
   assert.match(workflow, /require\(['"]\.\/package\.json['"]\)\.version/);
   assert.match(workflow, /CURRENT_REF: \$\{\{ github\.ref \}\}/);
   assert.match(workflow, /refs\/heads\/\$\{DEFAULT_BRANCH\}/);
@@ -32,18 +31,23 @@ test("manual releases derive their tag and app archives from package.json", () =
     workflow,
     /arch: arm64\s*\n\s+binary_arch: arm64\s*\n\s+runner: macos-15\s*\n\s+target: dist-mac-arm64/,
   );
+  const prepareJobStart = workflow.indexOf("  prepare-release:");
+  const testJobStart = workflow.indexOf("  test:");
   const buildJobStart = workflow.indexOf("  build-and-package:");
   const uploadJobStart = workflow.indexOf("  upload-to-release:");
-  const testJobStart = workflow.indexOf("  test:");
 
+  assert.notEqual(prepareJobStart, -1, "workflow should contain a prepare job");
   assert.notEqual(testJobStart, -1, "workflow should contain a test job");
   assert.notEqual(buildJobStart, -1, "workflow should contain a build job");
   assert.notEqual(uploadJobStart, -1, "workflow should contain an upload job");
+  assert.ok(prepareJobStart < testJobStart, "prepare job should precede test job");
   assert.ok(testJobStart < buildJobStart, "test job should precede the build job");
   assert.ok(buildJobStart < uploadJobStart, "build job should precede upload job");
 
+  const prepareJob = workflow.slice(prepareJobStart, testJobStart);
   const testJob = workflow.slice(testJobStart, buildJobStart);
   const buildJob = workflow.slice(buildJobStart, uploadJobStart);
+  const uploadJob = workflow.slice(uploadJobStart);
   const pnpmSetupIndex = buildJob.indexOf("uses: pnpm/action-setup@v5");
   const nodeSetupIndex = buildJob.indexOf("uses: actions/setup-node@v6");
 
@@ -62,16 +66,24 @@ test("manual releases derive their tag and app archives from package.json", () =
     "pnpm should be installed before setup-node configures its cache",
   );
   assert.match(workflow, /persist-credentials: false/);
+  assert.match(prepareJob, /^    name: Prepare release$/m);
+  assert.match(prepareJob, /outputs:\s*\n\s+release_tag:/);
+  assert.match(testJob, /^    name: Run test$/m);
   assert.match(testJob, /runs-on: macos-15/);
   assert.match(testJob, /- name: Run tests\s*\n\s+run: pnpm test/);
+  assert.match(
+    buildJob,
+    /^    name: Build macOS \(\$\{\{ matrix\.arch \}\}\)$/m,
+  );
   assert.match(workflow, /lipo -archs/);
   assert.match(workflow, /PlistBuddy -c 'Print :CFBundleShortVersionString'/);
   assert.match(workflow, /build-info-\$\{arch\}\.json/);
   assert.match(workflow, /uses: actions\/upload-artifact@v6/);
   assert.match(workflow, /retention-days: 1/);
-  assert.match(workflow, /build-and-package:[\s\S]*?needs: \[prepare-release, test\]/);
-  assert.match(workflow, /upload-to-release:\s*\n\s+needs: \[prepare-release, build-and-package\]/);
-  assert.match(workflow, /upload-to-release:[\s\S]*?permissions:\s*\n\s+contents: write/);
+  assert.match(buildJob, /needs: \[prepare-release, test\]/);
+  assert.match(uploadJob, /^    name: Upload to release$/m);
+  assert.match(uploadJob, /needs: \[prepare-release, build-and-package\]/);
+  assert.match(uploadJob, /permissions:\s*\n\s+contents: write/);
   assert.match(workflow, /uses: actions\/download-artifact@v7/);
   assert.match(workflow, /Create and verify signed update manifest/);
   assert.match(workflow, /UPDATE_SIGNING_PRIVATE_KEY: \$\{\{ secrets\.UPDATE_SIGNING_PRIVATE_KEY \}\}/);
