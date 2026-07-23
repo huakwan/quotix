@@ -248,6 +248,42 @@
         gap: 4px;
         margin-top: 10px;
       }
+      .update-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 8px;
+        margin: 10px 0;
+      }
+      .update-copy {
+        min-width: 0;
+      }
+      .update-label {
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.3;
+      }
+      .update-progress {
+        width: 100%;
+        height: 4px;
+        display: block;
+        margin-top: 4px;
+        accent-color: var(--green);
+      }
+      .update-btn {
+        border: 0;
+        border-radius: 6px;
+        padding: 4px 8px;
+        background: var(--control);
+        color: var(--fg);
+        font: inherit;
+        font-size: 10px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .update-btn:hover {
+        background: var(--control-hover);
+      }
       .version {
         color: var(--muted);
         font-size: 10px;
@@ -362,6 +398,19 @@
         </div>
       </div>
       <div class="divider"></div>
+      <div class="update-row hidden" id="update-row">
+        <div class="update-copy">
+          <div class="update-label" id="update-label"></div>
+          <progress
+            class="update-progress hidden"
+            id="update-progress"
+            max="100"
+            value="0"
+            aria-label="Update download progress"
+          ></progress>
+        </div>
+        <button class="update-btn hidden" id="update-action" type="button"></button>
+      </div>
       <div class="footer">
         <span class="version" id="version"></span>
         <div class="actions">

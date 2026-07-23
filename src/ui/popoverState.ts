@@ -1,10 +1,12 @@
 import type { ProviderId, Quota, QuotaSnapshot, QuotaWindow, SourceState } from "../quota/model";
 import type { Preferences } from "../preferences";
+import type { UpdateViewState } from "../update/model";
 
 export interface PopoverPayload {
   snapshot: QuotaSnapshot;
   preferences: Preferences;
   nowSec: number;
+  update: UpdateViewState;
 }
 
 export interface PopoverSection {
@@ -50,4 +52,61 @@ export function sectionsForPayload(payload: PopoverPayload): PopoverSection[] {
 
 export function showMenuBarSetting(preferences: Preferences): boolean {
   return preferences.source === "both";
+}
+
+export type UpdateAction = "download" | "cancel" | "install" | "reveal" | "retry";
+
+export interface UpdatePresentation {
+  visible: boolean;
+  label: string;
+  action: UpdateAction | null;
+  actionLabel: string;
+  progress: number | null;
+}
+
+export function updatePresentation(state: UpdateViewState): UpdatePresentation {
+  switch (state.status) {
+    case "idle":
+      return { visible: false, label: "", action: null, actionLabel: "", progress: null };
+    case "checking":
+      return { visible: true, label: "Checking for updates…", action: null, actionLabel: "", progress: null };
+    case "up-to-date":
+      return {
+        visible: true,
+        label: `Up to date${state.version ? ` — v${state.version}` : ""}`,
+        action: null,
+        actionLabel: "",
+        progress: null,
+      };
+    case "available":
+      return {
+        visible: true, label: `Version ${state.version} is available`,
+        action: "download", actionLabel: "Download", progress: null,
+      };
+    case "downloading":
+      return {
+        visible: true, label: `Downloading ${state.version}…`,
+        action: "cancel", actionLabel: "Cancel",
+        progress: Math.max(0, Math.min(100, state.progress)),
+      };
+    case "verifying":
+      return { visible: true, label: "Verifying update…", action: null, actionLabel: "", progress: null };
+    case "ready":
+      return {
+        visible: true, label: `Version ${state.version} is ready`,
+        action: "install", actionLabel: "Install and Restart", progress: null,
+      };
+    case "installing":
+      return { visible: true, label: "Installing update…", action: null, actionLabel: "", progress: null };
+    case "fallback":
+      return {
+        visible: true, label: "Manual replacement is required",
+        action: "reveal", actionLabel: "Show in Finder", progress: null,
+      };
+    case "error":
+      return {
+        visible: true, label: state.error,
+        action: "retry", actionLabel: "Retry", progress: null,
+      };
+  }
 }

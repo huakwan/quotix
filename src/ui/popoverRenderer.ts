@@ -1,4 +1,11 @@
-import { quotaRowsForProvider, sectionsForPayload, showMenuBarSetting, type PopoverPayload } from "./popoverState";
+import {
+  quotaRowsForProvider,
+  sectionsForPayload,
+  showMenuBarSetting,
+  updatePresentation,
+  type PopoverPayload,
+  type UpdateAction,
+} from "./popoverState";
 import type { DisplaySource, ProviderId, QuotaWindow, SourceState } from "../quota/model";
 import type { ResetMode } from "../preferences";
 
@@ -11,6 +18,11 @@ declare global {
       setResetMode(mode: ResetMode): void;
       setShowPaceLine(value: boolean): void;
       refresh(): void;
+      checkForUpdates(): void;
+      downloadUpdate(): void;
+      cancelUpdate(): void;
+      installUpdate(): void;
+      revealUpdate(): void;
       quit(): void;
       resize(height: number): void;
     };
@@ -20,6 +32,7 @@ declare global {
 declare const __APP_VERSION__: string;
 
 let last: PopoverPayload | null = null;
+let currentUpdateAction: UpdateAction | null = null;
 
 function colorClass(pct: number): "green" | "amber" | "red" {
   if (pct > 90) { return "red"; }
@@ -162,6 +175,19 @@ function draw(): void {
   syncButtons("reset-mode", last.preferences.resetMode);
   syncButtons("pace-mode", last.preferences.showPaceLine ? "on" : "off");
   document.getElementById("menu-source-row")!.classList.toggle("hidden", !showMenuBarSetting(last.preferences));
+  const update = updatePresentation(last.update ?? { status: "idle" });
+  const updateRow = document.getElementById("update-row")!;
+  const updateLabel = document.getElementById("update-label")!;
+  const updateButton = document.getElementById("update-action")! as HTMLButtonElement;
+  const updateProgress = document.getElementById("update-progress")! as HTMLProgressElement;
+  updateRow.classList.toggle("hidden", !update.visible);
+  updateLabel.textContent = update.label;
+  currentUpdateAction = update.action;
+  updateButton.textContent = update.actionLabel;
+  updateButton.classList.toggle("hidden", update.action === null);
+  updateButton.disabled = update.action === null;
+  updateProgress.classList.toggle("hidden", update.progress === null);
+  updateProgress.value = update.progress ?? 0;
 }
 
 function onSegment(id: string, callback: (value: string) => void): void {
@@ -177,6 +203,15 @@ onSegment("menu-source", (value) => window.quotix.setMenuBarSource(value as Prov
 onSegment("reset-mode", (value) => window.quotix.setResetMode(value as ResetMode));
 onSegment("pace-mode", (value) => window.quotix.setShowPaceLine(value === "on"));
 document.getElementById("refresh")!.addEventListener("click", () => window.quotix.refresh());
+document.getElementById("update-action")!.addEventListener("click", () => {
+  switch (currentUpdateAction) {
+    case "download": window.quotix.downloadUpdate(); break;
+    case "cancel": window.quotix.cancelUpdate(); break;
+    case "install": window.quotix.installUpdate(); break;
+    case "reveal": window.quotix.revealUpdate(); break;
+    case "retry": window.quotix.checkForUpdates(); break;
+  }
+});
 document.getElementById("quit")!.addEventListener("click", () => window.quotix.quit());
 document.getElementById("version")!.textContent = `hu@KwaN - v${__APP_VERSION__}`;
 

@@ -43,3 +43,23 @@ test("updated age uses seconds only after ten seconds and before one minute", ()
   assert.equal(updatedAgo(100, 159), "updated 59 sec ago");
   assert.equal(updatedAgo(100, 160), "updated 1 min ago");
 });
+
+test("popover wires only named assisted-update actions", () => {
+  const renderer = readFileSync(join(root, "src/ui/popoverRenderer.ts"), "utf8");
+  const preload = readFileSync(join(root, "src/ui/preload.ts"), "utf8");
+
+  for (const method of [
+    "checkForUpdates",
+    "downloadUpdate",
+    "cancelUpdate",
+    "installUpdate",
+    "revealUpdate",
+  ]) {
+    assert.match(renderer, new RegExp(`window\\.quotix\\.${method}\\(`));
+  }
+  assert.match(preload, /ipcRenderer\.send\("update:check"\)/);
+  assert.match(preload, /ipcRenderer\.send\("update:download"\)/);
+  assert.doesNotMatch(preload, /send:\s*ipcRenderer\.send/);
+  assert.doesNotMatch(renderer, /stagingRoot|appPath|browser_download_url/);
+  assert.match(renderer, /updateLabel\.textContent = update\.label/);
+});

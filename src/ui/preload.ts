@@ -14,6 +14,11 @@ contextBridge.exposeInMainWorld("quotix", {
   setResetMode: (mode: ResetMode): void => { ipcRenderer.send("preferences:setResetMode", mode); },
   setShowPaceLine: (value: boolean): void => { ipcRenderer.send("preferences:setShowPaceLine", value); },
   refresh: (): void => { ipcRenderer.send("quota:refresh"); },
+  checkForUpdates: (): void => { ipcRenderer.send("update:check"); },
+  downloadUpdate: (): void => { ipcRenderer.send("update:download"); },
+  cancelUpdate: (): void => { ipcRenderer.send("update:cancel"); },
+  installUpdate: (): void => { ipcRenderer.send("update:install"); },
+  revealUpdate: (): void => { ipcRenderer.send("update:reveal"); },
   quit: (): void => { ipcRenderer.send("quota:quit"); },
   resize: (height: number): void => { ipcRenderer.send("popover:resize", height); },
 });

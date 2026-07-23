@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { quotaRowsForProvider, sectionsForPayload, showMenuBarSetting } from "../out/src/ui/popoverState.js";
+import {
+  quotaRowsForProvider,
+  sectionsForPayload,
+  showMenuBarSetting,
+  updatePresentation,
+} from "../out/src/ui/popoverState.js";
 
 const missing = { enabled: false, loading: false, result: { ok: false, reason: "missing" }, lastGood: null };
 const quota = { updatedAt: 100, session: null, weekly: null, planDetected: false };
@@ -78,4 +83,23 @@ test("inactive per-model weekly quota still appends a row with a null window", (
   const rows = quotaRowsForProvider("claude", inactive);
   assert.deepEqual(rows.map((row) => row.label), ["5H", "7D", "FA"]);
   assert.equal(rows[2].window, null);
+});
+
+test("update presentation maps state to fixed safe actions", () => {
+  assert.deepEqual(updatePresentation({ status: "idle" }), {
+    visible: false, label: "", action: null, actionLabel: "", progress: null,
+  });
+  assert.equal(updatePresentation({ status: "checking" }).label, "Checking for updates…");
+  assert.equal(updatePresentation({ status: "up-to-date", version: "1.0.6" }).label, "Up to date — v1.0.6");
+  assert.deepEqual(updatePresentation({ status: "available", version: "1.0.7" }), {
+    visible: true,
+    label: "Version 1.0.7 is available",
+    action: "download",
+    actionLabel: "Download",
+    progress: null,
+  });
+  assert.equal(updatePresentation({ status: "downloading", version: "1.0.7", progress: 150 }).progress, 100);
+  assert.equal(updatePresentation({ status: "ready", version: "1.0.7" }).action, "install");
+  assert.equal(updatePresentation({ status: "fallback", version: "1.0.7" }).action, "reveal");
+  assert.equal(updatePresentation({ status: "error", error: "Unable to update." }).action, "retry");
 });
