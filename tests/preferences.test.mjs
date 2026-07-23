@@ -14,6 +14,7 @@ test("preferences default to both with Claude in the menu bar", () => {
     menuBarSource: "claude",
     resetMode: "countdown",
     showPaceLine: true,
+    openAtLogin: false,
   });
 });
 
@@ -21,7 +22,13 @@ test("invalid preference fields fall back independently", () => {
   const prefs = loadPreferences("/data", {
     readFile: () => JSON.stringify({ source: "bad", menuBarSource: "codex", resetMode: "clock" }),
   });
-  assert.deepEqual(prefs, { source: "both", menuBarSource: "codex", resetMode: "clock", showPaceLine: true });
+  assert.deepEqual(prefs, {
+    source: "both",
+    menuBarSource: "codex",
+    resetMode: "clock",
+    showPaceLine: true,
+    openAtLogin: false,
+  });
 });
 
 test("pace line honors a stored boolean and falls back on bad input", () => {
@@ -31,6 +38,15 @@ test("pace line honors a stored boolean and falls back on bad input", () => {
   assert.equal(loadPreferences("/data", {
     readFile: () => JSON.stringify({ showPaceLine: "yes" }),
   }).showPaceLine, true);
+});
+
+test("open at login honors a stored boolean and falls back on bad input", () => {
+  assert.equal(loadPreferences("/data", {
+    readFile: () => JSON.stringify({ openAtLogin: true }),
+  }).openAtLogin, true);
+  assert.equal(loadPreferences("/data", {
+    readFile: () => JSON.stringify({ openAtLogin: "yes" }),
+  }).openAtLogin, false);
 });
 
 test("single source overrides the persisted menu-bar source", () => {

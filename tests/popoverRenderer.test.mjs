@@ -63,3 +63,15 @@ test("popover wires only named assisted-update actions", () => {
   assert.doesNotMatch(renderer, /stagingRoot|appPath|browser_download_url/);
   assert.match(renderer, /updateLabel\.textContent = update\.label/);
 });
+
+test("popover exposes a fixed open-at-login preference action", () => {
+  const renderer = readFileSync(join(root, "src/ui/popoverRenderer.ts"), "utf8");
+  const preload = readFileSync(join(root, "src/ui/preload.ts"), "utf8");
+  const html = readFileSync(join(root, "src/ui/popover.html"), "utf8");
+  const main = readFileSync(join(root, "src/main.ts"), "utf8");
+
+  assert.match(html, /id="login-mode"/);
+  assert.match(renderer, /window\.quotix\.setOpenAtLogin\(value === "on"\)/);
+  assert.match(preload, /ipcRenderer\.send\("preferences:setOpenAtLogin", value\)/);
+  assert.match(main, /function render\(\)[\s\S]*?refreshOpenAtLoginPreference\(\)/);
+});

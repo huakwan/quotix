@@ -16,3 +16,7 @@ export function asResetMode(value: unknown): ResetMode | null {
 export function asShowPaceLine(value: unknown): boolean | null {
   return typeof value === "boolean" ? value : null;
 }
+
+export function asOpenAtLogin(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}

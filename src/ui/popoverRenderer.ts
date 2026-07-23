@@ -17,6 +17,7 @@ declare global {
       setMenuBarSource(source: ProviderId): void;
       setResetMode(mode: ResetMode): void;
       setShowPaceLine(value: boolean): void;
+      setOpenAtLogin(value: boolean): void;
       refresh(): void;
       checkForUpdates(): void;
       downloadUpdate(): void;
@@ -174,6 +175,7 @@ function draw(): void {
   syncButtons("menu-source", last.preferences.menuBarSource);
   syncButtons("reset-mode", last.preferences.resetMode);
   syncButtons("pace-mode", last.preferences.showPaceLine ? "on" : "off");
+  syncButtons("login-mode", last.preferences.openAtLogin ? "on" : "off");
   document.getElementById("menu-source-row")!.classList.toggle("hidden", !showMenuBarSetting(last.preferences));
   const update = updatePresentation(last.update ?? { status: "idle" });
   const updateRow = document.getElementById("update-row")!;
@@ -202,6 +204,7 @@ onSegment("source-mode", (value) => window.quotix.setSource(value as DisplaySour
 onSegment("menu-source", (value) => window.quotix.setMenuBarSource(value as ProviderId));
 onSegment("reset-mode", (value) => window.quotix.setResetMode(value as ResetMode));
 onSegment("pace-mode", (value) => window.quotix.setShowPaceLine(value === "on"));
+onSegment("login-mode", (value) => window.quotix.setOpenAtLogin(value === "on"));
 document.getElementById("refresh")!.addEventListener("click", () => window.quotix.refresh());
 document.getElementById("update-action")!.addEventListener("click", () => {
   switch (currentUpdateAction) {

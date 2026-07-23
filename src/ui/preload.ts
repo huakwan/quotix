@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld("quotix", {
   setMenuBarSource: (source: ProviderId): void => { ipcRenderer.send("preferences:setMenuBarSource", source); },
   setResetMode: (mode: ResetMode): void => { ipcRenderer.send("preferences:setResetMode", mode); },
   setShowPaceLine: (value: boolean): void => { ipcRenderer.send("preferences:setShowPaceLine", value); },
+  setOpenAtLogin: (value: boolean): void => { ipcRenderer.send("preferences:setOpenAtLogin", value); },
   refresh: (): void => { ipcRenderer.send("quota:refresh"); },
   checkForUpdates: (): void => { ipcRenderer.send("update:check"); },
   downloadUpdate: (): void => { ipcRenderer.send("update:download"); },

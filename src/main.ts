@@ -21,7 +21,14 @@ import { CodexQuotaProvider } from "./quota/codex/provider";
 import { QuotaCoordinator } from "./quota/coordinator";
 import type { ProviderId, QuotaSnapshot } from "./quota/model";
 import { SourceRuntime } from "./quota/sourceRuntime";
-import { asDisplaySource, asMenuBarSource, asResetMode, asShowPaceLine } from "./preferenceInput";
+import { syncOpenAtLogin, updateOpenAtLogin } from "./loginItem";
+import {
+  asDisplaySource,
+  asMenuBarSource,
+  asOpenAtLogin,
+  asResetMode,
+  asShowPaceLine,
+} from "./preferenceInput";
 import {
   effectiveMenuBarSource,
   loadPreferences,
@@ -58,9 +65,17 @@ let disposed = false;
 
 function currentSnapshot(): QuotaSnapshot | undefined { return coordinator?.snapshot(); }
 
+function refreshOpenAtLoginPreference(): void {
+  const synced = syncOpenAtLogin(app, preferences);
+  if (synced === preferences) { return; }
+  preferences = synced;
+  savePreferences(app.getPath("userData"), preferences);
+}
+
 function render(): void {
   const snapshot = currentSnapshot();
   if (!tray || !snapshot) { return; }
+  refreshOpenAtLoginPreference();
   const provider = effectiveMenuBarSource(preferences);
   tray.setTitle("");
   void updateTray(provider, snapshot);
@@ -150,6 +165,13 @@ function registerIpc(): void {
     preferences = { ...preferences, showPaceLine };
     persistPreferences();
   });
+  ipcMain.on("preferences:setOpenAtLogin", (_event, value: unknown) => {
+    const requested = asOpenAtLogin(value);
+    if (requested === null) { return; }
+    const openAtLogin = updateOpenAtLogin(app, requested, preferences.openAtLogin);
+    preferences = { ...preferences, openAtLogin };
+    persistPreferences();
+  });
 }
 
 function dispose(): void {
@@ -172,6 +194,8 @@ app.whenReady().then(async () => {
   app.dock?.hide();
   const userDataDir = app.getPath("userData");
   preferences = loadPreferences(userDataDir);
+  preferences = syncOpenAtLogin(app, preferences);
+  savePreferences(userDataDir, preferences);
 
   coordinator = new QuotaCoordinator({
     claude: () => new SourceRuntime(

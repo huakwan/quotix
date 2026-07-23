@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { asDisplaySource, asMenuBarSource, asResetMode, asShowPaceLine } from "../out/src/preferenceInput.js";
+import {
+  asDisplaySource,
+  asMenuBarSource,
+  asOpenAtLogin,
+  asResetMode,
+  asShowPaceLine,
+} from "../out/src/preferenceInput.js";
 
 test("display source accepts only Claude, Codex, or Both", () => {
   assert.equal(asDisplaySource("claude"), "claude");
@@ -28,4 +34,11 @@ test("pace line accepts only booleans", () => {
   assert.equal(asShowPaceLine(false), false);
   assert.equal(asShowPaceLine("on"), null);
   assert.equal(asShowPaceLine(1), null);
+});
+
+test("open at login accepts only booleans", () => {
+  assert.equal(asOpenAtLogin(true), true);
+  assert.equal(asOpenAtLogin(false), false);
+  assert.equal(asOpenAtLogin("on"), null);
+  assert.equal(asOpenAtLogin(1), null);
 });

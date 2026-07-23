@@ -9,6 +9,7 @@ export interface Preferences {
   menuBarSource: ProviderId;
   resetMode: ResetMode;
   showPaceLine: boolean;
+  openAtLogin: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -16,6 +17,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   menuBarSource: "claude",
   resetMode: "countdown",
   showPaceLine: true,
+  openAtLogin: false,
 };
 
 interface ReadDeps { readFile(path: string): string; }
@@ -44,6 +46,8 @@ export function loadPreferences(userDataDir: string, deps: ReadDeps = defaultRea
         ? value.resetMode : DEFAULT_PREFERENCES.resetMode,
       showPaceLine: typeof value.showPaceLine === "boolean"
         ? value.showPaceLine : DEFAULT_PREFERENCES.showPaceLine,
+      openAtLogin: typeof value.openAtLogin === "boolean"
+        ? value.openAtLogin : DEFAULT_PREFERENCES.openAtLogin,
     };
   } catch {
     return { ...DEFAULT_PREFERENCES };
