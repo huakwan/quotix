@@ -97,6 +97,7 @@ test("about action sits beside refresh and uses a narrow preload API", () => {
   const main = readFileSync(join(root, "src/main.ts"), "utf8");
 
   assert.match(html, /id="about"[\s\S]*?id="refresh"/);
+  assert.match(html, /#about svg\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/);
   assert.match(renderer, /window\.quotix\.openAbout\(\)/);
   assert.match(preload, /ipcRenderer\.send\("about:open"\)/);
   assert.doesNotMatch(preload, /ipcRenderer\.send\("about:close"\)/);
