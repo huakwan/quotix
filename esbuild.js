@@ -18,10 +18,15 @@ async function main() {
   const node = {
     bundle: true, format: "cjs", platform: "node", target: "node20",
     external: ["electron"], sourcemap: true, logLevel: "info",
-    loader: { ".svg": "base64", ".html": "text" },
+    loader: { ".svg": "base64", ".html": "text", ".pem": "text" },
   };
   const contexts = await Promise.all([
     esbuild.context({ ...node, entryPoints: ["src/main.ts"], outfile: "dist/main.js" }),
+    esbuild.context({
+      ...node,
+      entryPoints: ["src/update/installerHelper.ts"],
+      outfile: "dist/installerHelper.js",
+    }),
     esbuild.context({ ...node, entryPoints: ["src/ui/preload.ts"], outfile: "dist/preload.js" }),
     esbuild.context({
       entryPoints: ["src/ui/popoverRenderer.ts"], outfile: "dist/popoverRenderer.js",

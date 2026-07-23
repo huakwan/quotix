@@ -29,6 +29,24 @@ export type ReleaseCheckResult =
   | { status: "up-to-date" }
   | { status: "available"; release: AvailableRelease };
 
+export interface VerifiedUpdate {
+  version: string;
+  stagingRoot: string;
+  appPath: string;
+}
+
+export type UpdateViewState =
+  | { status: "idle" }
+  | { status: "checking" }
+  | { status: "up-to-date"; version: string }
+  | { status: "available"; version: string }
+  | { status: "downloading"; version: string; progress: number }
+  | { status: "verifying"; version: string }
+  | { status: "ready"; version: string }
+  | { status: "installing"; version: string }
+  | { status: "fallback"; version: string }
+  | { status: "error"; error: string };
+
 export class UpdateError extends Error {
   constructor(public readonly code: string) {
     super(code);

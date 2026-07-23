@@ -1,4 +1,16 @@
-import { app, BrowserWindow, ipcMain, Menu, nativeImage, nativeTheme, Tray } from "electron";
+import { spawn } from "node:child_process";
+import { join } from "node:path";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  nativeImage,
+  nativeTheme,
+  shell,
+  Tray,
+} from "electron";
 import { createQuotaCache } from "./quota/cache";
 import { ClaudeQuotaProvider } from "./quota/claude/provider";
 import { createCachedTokenProvider } from "./quota/claude/credentials";
@@ -18,8 +30,16 @@ import {
 import { createPopover, resizePopover, togglePopover } from "./ui/popoverWindow";
 import { renderTray } from "./ui/trayCapture";
 import { trayDisplayState } from "./ui/trayState";
+import { UpdateCoordinator } from "./update/coordinator";
+import { acknowledgeUpdatedLaunch, installVerifiedUpdate } from "./update/installer";
+import type { UpdateArch } from "./update/model";
+import { ReleaseChecker } from "./update/releaseChecker";
+import { stageUpdate } from "./update/stager";
+import updatePublicKey from "./update/update-public-key.pem";
 
 const REFRESH_INTERVAL_SECONDS = 2 * 60;
+const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const UPDATE_STARTUP_DELAY_MS = 30 * 1000;
 
 let tray: Tray | undefined;
 let popover: BrowserWindow | undefined;
@@ -27,6 +47,10 @@ let coordinator: QuotaCoordinator | undefined;
 let preferences: Preferences;
 let pollTimer: NodeJS.Timeout | undefined;
 let unsubscribeCoordinator: (() => void) | undefined;
+let updateCoordinator: UpdateCoordinator | undefined;
+let unsubscribeUpdate: (() => void) | undefined;
+let updateStartupTimer: NodeJS.Timeout | undefined;
+let updateCheckTimer: NodeJS.Timeout | undefined;
 let disposed = false;
 
 function currentSnapshot(): QuotaSnapshot | undefined { return coordinator?.snapshot(); }
@@ -42,6 +66,7 @@ function render(): void {
       snapshot,
       preferences,
       nowSec: Math.floor(Date.now() / 1000),
+      update: updateCoordinator?.view() ?? { status: "idle" },
     });
   }
 }
@@ -68,9 +93,26 @@ function persistPreferences(): void {
   render();
 }
 
+function showPopoverForUpdate(): void {
+  if (popover && tray && !popover.isVisible()) {
+    togglePopover(popover, tray.getBounds());
+  }
+  render();
+}
+
+function checkForUpdates(manual: boolean): void {
+  if (manual) { showPopoverForUpdate(); }
+  void updateCoordinator?.check(manual);
+}
+
 function registerIpc(): void {
   ipcMain.on("quota:refresh", () => poll(true));
   ipcMain.on("quota:quit", () => app.quit());
+  ipcMain.on("update:check", () => checkForUpdates(true));
+  ipcMain.on("update:download", () => { void updateCoordinator?.download(); });
+  ipcMain.on("update:cancel", () => updateCoordinator?.cancel());
+  ipcMain.on("update:install", () => { void updateCoordinator?.install(); });
+  ipcMain.on("update:reveal", () => { void updateCoordinator?.reveal(); });
   ipcMain.on("popover:resize", (_event, height: unknown) => {
     if (popover && typeof height === "number" && Number.isFinite(height)) {
       resizePopover(popover, height);
@@ -111,9 +153,15 @@ function dispose(): void {
   unsubscribeCoordinator = undefined;
   coordinator?.dispose();
   coordinator = undefined;
+  unsubscribeUpdate?.();
+  unsubscribeUpdate = undefined;
+  updateCoordinator?.dispose();
+  updateCoordinator = undefined;
+  if (updateStartupTimer) { clearTimeout(updateStartupTimer); updateStartupTimer = undefined; }
+  if (updateCheckTimer) { clearInterval(updateCheckTimer); updateCheckTimer = undefined; }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   app.dock?.hide();
   const userDataDir = app.getPath("userData");
   preferences = loadPreferences(userDataDir);
@@ -136,21 +184,78 @@ app.whenReady().then(() => {
 
   popover = createPopover();
   tray = new Tray(nativeImage.createEmpty());
-  const contextMenu = Menu.buildFromTemplate([
-    { label: "Refresh now", click: () => poll(true) },
-    { type: "separator" },
-    { label: "Quit", role: "quit" },
-  ]);
   tray.on("click", () => {
     if (popover && tray && togglePopover(popover, tray.getBounds())) { render(); }
   });
-  tray.on("right-click", () => tray?.popUpContextMenu(contextMenu));
+  tray.on("right-click", () => tray?.popUpContextMenu(Menu.buildFromTemplate([
+    { label: "Refresh now", click: () => poll(true) },
+    { label: "Check for Updates…", click: () => checkForUpdates(true) },
+    { type: "separator" },
+    { label: "Quit", role: "quit" },
+  ])));
+
+  const updateArch: UpdateArch | null = process.arch === "arm64" || process.arch === "x64"
+    ? process.arch
+    : null;
+  const updatesRoot = join(userDataDir, "updates");
+  updateCoordinator = new UpdateCoordinator({
+    currentVersion: app.getVersion(),
+    check: () => {
+      if (process.platform !== "darwin" || !updateArch) {
+        throw new Error("updates unsupported");
+      }
+      return new ReleaseChecker({
+        fetchImpl: fetch,
+        publicKey: updatePublicKey,
+        appVersion: app.getVersion(),
+        arch: updateArch,
+      }).check();
+    },
+    stage: (release, hooks, signal) => {
+      if (!updateArch) { throw new Error("updates unsupported"); }
+      return stageUpdate(release, updatesRoot, updateArch, hooks, signal);
+    },
+    install: (update) => installVerifiedUpdate({
+      update,
+      execPath: process.execPath,
+      helperSource: join(__dirname, "installerHelper.js"),
+      originalPid: process.pid,
+      confirm: async (mode) => {
+        const automatic = mode === "automatic";
+        const result = await dialog.showMessageBox({
+          type: "warning",
+          buttons: ["Cancel", automatic ? "Install and Restart" : "Allow and Show in Finder"],
+          defaultId: 0,
+          cancelId: 0,
+          title: `Install Quotix ${update.version}?`,
+          message: automatic
+            ? `Quotix ${update.version} was verified and is ready to replace this copy.`
+            : `Quotix ${update.version} was verified, but this copy cannot be replaced automatically.`,
+          detail: "Quotix is not Apple-signed. Continuing removes quarantine only from the verified downloaded copy.",
+          noLink: true,
+        });
+        return result.response === 1;
+      },
+      reveal: (path) => shell.showItemInFolder(path),
+      spawnHelper: (executable, args, options) => spawn(executable, args, options),
+      quit: () => app.quit(),
+    }),
+    reveal: async (update) => shell.showItemInFolder(update.appPath),
+  });
+  unsubscribeUpdate = updateCoordinator.subscribe(render);
 
   registerIpc();
   render();
   poll();
   pollTimer = setInterval(() => poll(), REFRESH_INTERVAL_SECONDS * 1000);
+  updateStartupTimer = setTimeout(() => checkForUpdates(false), UPDATE_STARTUP_DELAY_MS);
+  updateCheckTimer = setInterval(() => checkForUpdates(false), UPDATE_CHECK_INTERVAL_MS);
   nativeTheme.on("updated", render);
+  try {
+    await acknowledgeUpdatedLaunch(process.argv, userDataDir);
+  } catch {
+    /* the helper will time out and restore the previous version */
+  }
 });
 
 app.on("before-quit", dispose);
