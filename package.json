@@ -68,5 +68,8 @@
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.1",
     "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "yauzl": "^3.4.0"
   }
 }
