@@ -31,7 +31,6 @@ export interface ReleaseCheckerOptions {
   publicKey: string | Buffer;
   appVersion: string;
   arch: UpdateArch;
-  forceAvailable?: boolean;
 }
 
 async function boundedBytes(response: Response, errorCode: string): Promise<Buffer> {
@@ -185,7 +184,7 @@ export class ReleaseChecker {
     if (!latest || release.draft || release.prerelease) {
       throw new UpdateError("release_invalid");
     }
-    if (!this.options.forceAvailable && compareVersions(latest, current) <= 0) {
+    if (compareVersions(latest, current) <= 0) {
       return { status: "up-to-date" };
     }
 

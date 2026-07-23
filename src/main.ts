@@ -260,7 +260,6 @@ app.whenReady().then(async () => {
         publicKey: updatePublicKey,
         appVersion: app.getVersion(),
         arch: updateArch,
-        forceAvailable: !app.isPackaged,
       }).check();
     },
     stage: (release, hooks, signal) => {

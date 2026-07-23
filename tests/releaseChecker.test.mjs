@@ -88,36 +88,6 @@ test("release checker reports equal or older stable versions as up to date", asy
   }
 });
 
-test("release checker can force equal or older stable versions to be available for development", async () => {
-  for (const version of ["1.0.6", "1.0.5"]) {
-    const data = fixture(version);
-    const checker = new ReleaseChecker({
-      fetchImpl: fetchFor(data, []),
-      publicKey: publicPem,
-      appVersion: "1.0.6",
-      arch: "x64",
-      forceAvailable: true,
-    });
-    const result = await checker.check();
-    assert.equal(result.status, "available");
-    assert.equal(result.release.version, version);
-    assert.equal(result.release.asset.filename, `Quotix-v${version}-macos-x64.zip`);
-  }
-});
-
-test("forced development checks still reject a bad signature", async () => {
-  const data = fixture("1.0.6");
-  data.signature = Buffer.from("not a valid signature").toString("base64");
-  const checker = new ReleaseChecker({
-    fetchImpl: fetchFor(data, []),
-    publicKey: publicPem,
-    appVersion: "1.0.6",
-    arch: "arm64",
-    forceAvailable: true,
-  });
-  await assert.rejects(() => checker.check());
-});
-
 test("release checker rejects draft, prerelease, duplicate, mismatched, and untrusted assets", async () => {
   const mutations = [
     (data) => { data.release.draft = true; },
