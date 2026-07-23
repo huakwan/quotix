@@ -1,5 +1,5 @@
-import { readFile, readdir, realpath, rename, rm, stat } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { lstat, readFile, readdir, realpath, rename, rm, stat } from "node:fs/promises";
+import { basename, dirname, join, resolve } from "node:path";
 import { isContainedPath } from "./installPaths";
 import {
   parseInstallTransaction,
@@ -20,6 +20,12 @@ export interface RecoveryOptions {
   removeBackup?(path: string): Promise<void>;
 }
 
+export interface OrphanedBackupCleanupOptions {
+  updatesRoot: string;
+  currentBundlePath?: string;
+  removeBackup?(path: string): Promise<void>;
+}
+
 async function isSameDirectory(a: string, b: string): Promise<boolean> {
   if (a === b) { return true; }
   try {
@@ -35,6 +41,15 @@ async function exists(path: string): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+async function pathStatus(path: string): Promise<"present" | "missing" | "indeterminate"> {
+  try {
+    await lstat(path);
+    return "present";
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "ENOENT" ? "missing" : "indeterminate";
   }
 }
 
@@ -94,9 +109,15 @@ async function recoverOne(
   transactionPath: string,
   options: RecoveryOptions,
 ): Promise<{ notice?: RecoveryNotice; cleanup: boolean }> {
-  const transactionFileExists = await exists(transactionPath);
-  const transaction = transactionFileExists ? await readTransaction(transactionPath) : null;
-  if (!transactionFileExists) { return { cleanup: true }; }
+  const transactionFileStatus = await pathStatus(transactionPath);
+  if (transactionFileStatus === "missing") { return { cleanup: true }; }
+  if (transactionFileStatus === "indeterminate") {
+    return {
+      notice: { status: "manual-recovery", version: "unknown" },
+      cleanup: false,
+    };
+  }
+  const transaction = await readTransaction(transactionPath);
   if (!transaction || !await isSameDirectory(transaction.stagingRoot, stagingRoot)) {
     return {
       notice: { status: "manual-recovery", version: "unknown" },
@@ -174,4 +195,62 @@ export async function recoverInterruptedUpdates(
     }
   }
   return notices;
+}
+
+async function protectedBackupPaths(updatesRoot: string): Promise<Set<string> | null> {
+  let entries;
+  try {
+    entries = await readdir(updatesRoot, { withFileTypes: true });
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "ENOENT" ? new Set() : null;
+  }
+  const protectedPaths = new Set<string>();
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !entry.name.startsWith("update-")) { continue; }
+    const stagingRoot = resolve(updatesRoot, entry.name);
+    if (!isContainedPath(resolve(updatesRoot), stagingRoot)) { return null; }
+    const transactionPath = join(stagingRoot, "install-transaction.json");
+    const transactionFileStatus = await pathStatus(transactionPath);
+    if (transactionFileStatus === "missing") { continue; }
+    if (transactionFileStatus === "indeterminate") { return null; }
+    const transaction = await readTransaction(transactionPath);
+    if (!transaction || !await isSameDirectory(transaction.stagingRoot, stagingRoot)) {
+      return null;
+    }
+    protectedPaths.add(transaction.backupApp.toLowerCase());
+  }
+  return protectedPaths;
+}
+
+export async function cleanupOrphanedUpdateBackups(
+  options: OrphanedBackupCleanupOptions,
+): Promise<void> {
+  const installedApp = options.currentBundlePath;
+  if (!installedApp || !await exists(installedApp)) { return; }
+  const protectedPaths = await protectedBackupPaths(options.updatesRoot);
+  if (!protectedPaths) { return; }
+  const applicationsDir = dirname(installedApp);
+  const prefix = `${basename(installedApp)}.update-backup-`;
+  let entries;
+  try {
+    entries = await readdir(applicationsDir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    const suffix = entry.name.slice(prefix.length);
+    if (
+      !entry.name.startsWith(prefix)
+      || !/^[a-f0-9]{12}$/.test(suffix)
+      || !entry.isDirectory()
+      || entry.isSymbolicLink()
+    ) {
+      continue;
+    }
+    const candidate = join(applicationsDir, entry.name);
+    if (protectedPaths.has(candidate.toLowerCase())) { continue; }
+    await (options.removeBackup
+      ? options.removeBackup(candidate)
+      : rm(candidate, { recursive: true, force: true })).catch(() => undefined);
+  }
 }

@@ -1,14 +1,26 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { recoverInterruptedUpdates } from "../out/src/update/recovery.js";
+import {
+  cleanupOrphanedUpdateBackups,
+  recoverInterruptedUpdates,
+} from "../out/src/update/recovery.js";
 
 async function pathExists(path) {
   try {
     await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function entryExists(path) {
+  try {
+    await lstat(path);
     return true;
   } catch {
     return false;
@@ -193,4 +205,102 @@ test("startup recovery preserves a corrupt transaction for manual inspection", a
   });
   assert.deepEqual(notices, [{ status: "manual-recovery", version: "unknown" }]);
   assert.equal(await pathExists(value.stagingRoot), true);
+});
+
+test("startup cleanup removes only exact orphaned sibling backups", async () => {
+  const root = await mkdtemp(join(tmpdir(), "quotix-orphan-cleanup-"));
+  const updatesRoot = join(root, "updates");
+  const installedApp = join(root, "Applications", "Quotix.app");
+  const orphan = `${installedApp}.update-backup-123456789abc`;
+  const unrelated = `${installedApp}.update-backup-not-a-token`;
+  const symlinked = `${installedApp}.update-backup-abcdef123456`;
+  await mkdir(updatesRoot, { recursive: true });
+  await mkdir(installedApp, { recursive: true });
+  await mkdir(orphan, { recursive: true });
+  await mkdir(unrelated, { recursive: true });
+  await symlink(orphan, symlinked);
+
+  await cleanupOrphanedUpdateBackups({ updatesRoot, currentBundlePath: installedApp });
+
+  assert.equal(await pathExists(orphan), false);
+  assert.equal(await pathExists(unrelated), true);
+  assert.equal(await entryExists(symlinked), true);
+});
+
+test("startup cleanup preserves a backup referenced by a live transaction", async () => {
+  const value = await fixture("launching");
+  await mkdir(value.installedApp, { recursive: true });
+  await mkdir(value.transaction.backupApp, { recursive: true });
+
+  await cleanupOrphanedUpdateBackups({
+    updatesRoot: value.updatesRoot,
+    currentBundlePath: value.installedApp,
+  });
+
+  assert.equal(await pathExists(value.transaction.backupApp), true);
+});
+
+test("startup cleanup fails closed for a corrupt transaction", async () => {
+  const value = await fixture("complete");
+  const orphan = `${value.installedApp}.update-backup-123456789abc`;
+  await mkdir(value.installedApp, { recursive: true });
+  await mkdir(orphan, { recursive: true });
+  await writeFile(join(value.stagingRoot, "install-transaction.json"), "{broken");
+
+  await cleanupOrphanedUpdateBackups({
+    updatesRoot: value.updatesRoot,
+    currentBundlePath: value.installedApp,
+  });
+
+  assert.equal(await pathExists(orphan), true);
+});
+
+test("startup cleanup does nothing without a healthy installed app", async () => {
+  const root = await mkdtemp(join(tmpdir(), "quotix-orphan-cleanup-"));
+  const updatesRoot = join(root, "updates");
+  const installedApp = join(root, "Applications", "Quotix.app");
+  const orphan = `${installedApp}.update-backup-123456789abc`;
+  await mkdir(updatesRoot, { recursive: true });
+  await mkdir(orphan, { recursive: true });
+
+  await cleanupOrphanedUpdateBackups({ updatesRoot, currentBundlePath: installedApp });
+
+  assert.equal(await pathExists(orphan), true);
+});
+
+test("startup cleanup fails closed when transaction discovery is indeterminate", async () => {
+  const root = await mkdtemp(join(tmpdir(), "quotix-orphan-cleanup-"));
+  const updatesRoot = join(root, "updates");
+  const installedApp = join(root, "Applications", "Quotix.app");
+  const orphan = `${installedApp}.update-backup-123456789abc`;
+  await mkdir(installedApp, { recursive: true });
+  await mkdir(orphan, { recursive: true });
+  await writeFile(updatesRoot, "not a directory");
+
+  await cleanupOrphanedUpdateBackups({ updatesRoot, currentBundlePath: installedApp });
+
+  assert.equal(await pathExists(orphan), true);
+});
+
+test("recovery and cleanup preserve ambiguity from a dangling transaction symlink", async () => {
+  const root = await mkdtemp(join(tmpdir(), "quotix-orphan-cleanup-"));
+  const updatesRoot = join(root, "updates");
+  const stagingRoot = join(updatesRoot, "update-test");
+  const installedApp = join(root, "Applications", "Quotix.app");
+  const orphan = `${installedApp}.update-backup-123456789abc`;
+  await mkdir(stagingRoot, { recursive: true });
+  await mkdir(installedApp, { recursive: true });
+  await mkdir(orphan, { recursive: true });
+  await symlink(join(stagingRoot, "missing-transaction"), join(stagingRoot, "install-transaction.json"));
+
+  const notices = await recoverInterruptedUpdates({
+    updatesRoot,
+    currentBundlePath: installedApp,
+    currentVersion: "1.0.11",
+  });
+  await cleanupOrphanedUpdateBackups({ updatesRoot, currentBundlePath: installedApp });
+
+  assert.deepEqual(notices, [{ status: "manual-recovery", version: "unknown" }]);
+  assert.equal(await pathExists(stagingRoot), true);
+  assert.equal(await pathExists(orphan), true);
 });

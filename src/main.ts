@@ -42,7 +42,10 @@ import { UpdateCoordinator } from "./update/coordinator";
 import { acknowledgeUpdatedLaunch, installVerifiedUpdate } from "./update/installer";
 import { resolveInstalledBundle } from "./update/installPaths";
 import type { UpdateArch } from "./update/model";
-import { recoverInterruptedUpdates } from "./update/recovery";
+import {
+  cleanupOrphanedUpdateBackups,
+  recoverInterruptedUpdates,
+} from "./update/recovery";
 import { ReleaseChecker } from "./update/releaseChecker";
 import { stageUpdate } from "./update/stager";
 import updatePublicKey from "./update/key/quotix-update-public.pem";
@@ -330,6 +333,10 @@ app.whenReady().then(async () => {
       currentBundlePath: installed.eligible ? installed.bundlePath : undefined,
       currentVersion: app.getVersion(),
       skipTransactionPath: acknowledged?.transactionPath,
+    });
+    await cleanupOrphanedUpdateBackups({
+      updatesRoot,
+      currentBundlePath: installed.eligible ? installed.bundlePath : undefined,
     });
     for (const notice of notices) {
       await dialog.showMessageBox({
