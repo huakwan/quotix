@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 function popoverHtml() {
-  return readFileSync(join(root, "src/ui/popover.html"), "utf8");
+  return readFileSync(join(root, "src/ui/popover/popover.html"), "utf8");
 }
 
 function rootBlock(source) {
@@ -35,7 +35,7 @@ const semanticTokens = [
 ];
 
 test("popover window uses the native active menu material", () => {
-  const source = readFileSync(join(root, "src/ui/popoverWindow.ts"), "utf8");
+  const source = readFileSync(join(root, "src/ui/popover/popoverWindow.ts"), "utf8");
 
   assert.match(source, /vibrancy:\s*"menu"/);
   assert.match(source, /visualEffectState:\s*"active"/);

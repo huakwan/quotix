@@ -1,33 +1,28 @@
-import {
-  canActivateUpdateAction,
-  quotaRowsForProvider,
-  sectionsForPayload,
-  showMenuBarSetting,
-  updatePresentation,
-  type PopoverPayload,
-  type UpdateAction,
-} from "./popoverState";
-import type { DisplaySource, ProviderId, QuotaWindow, SourceState } from "../quota/model";
-import type { ResetMode } from "../preferences";
+import { canActivateUpdateAction, quotaRowsForProvider, sectionsForPayload, showMenuBarSetting, updatePresentation, type PopoverPayload, type UpdateAction, } from "./popoverState";
+import type { DisplaySource, ProviderId, QuotaWindow, SourceState } from "../../quota/model";
+import type { ResetMode } from "../../preferences";
 
 declare global {
+  interface QuotixApi {
+    onUpdate(cb: (payload: PopoverPayload) => void): void;
+    setSource(source: DisplaySource): void;
+    setMenuBarSource(source: ProviderId): void;
+    setResetMode(mode: ResetMode): void;
+    setShowPaceLine(value: boolean): void;
+    setOpenAtLogin(value: boolean): void;
+    refresh(): void;
+    openAbout(): void;
+    checkForUpdates(): void;
+    downloadUpdate(): void;
+    cancelUpdate(): void;
+    installUpdate(): void;
+    revealUpdate(): void;
+    quit(): void;
+    resize(height: number): void;
+  }
+
   interface Window {
-    quotix: {
-      onUpdate(cb: (payload: PopoverPayload) => void): void;
-      setSource(source: DisplaySource): void;
-      setMenuBarSource(source: ProviderId): void;
-      setResetMode(mode: ResetMode): void;
-      setShowPaceLine(value: boolean): void;
-      setOpenAtLogin(value: boolean): void;
-      refresh(): void;
-      checkForUpdates(): void;
-      downloadUpdate(): void;
-      cancelUpdate(): void;
-      installUpdate(): void;
-      revealUpdate(): void;
-      quit(): void;
-      resize(height: number): void;
-    };
+    quotix: QuotixApi;
   }
 }
 
@@ -211,6 +206,7 @@ onSegment("reset-mode", (value) => window.quotix.setResetMode(value as ResetMode
 onSegment("pace-mode", (value) => window.quotix.setShowPaceLine(value === "on"));
 onSegment("login-mode", (value) => window.quotix.setOpenAtLogin(value === "on"));
 document.getElementById("refresh")!.addEventListener("click", () => window.quotix.refresh());
+document.getElementById("about")!.addEventListener("click", () => window.quotix.openAbout());
 const updateActionButton = document.getElementById("update-action")!;
 updateActionButton.addEventListener("mousedown", (event) => {
   if (currentUpdateAction === "download") { event.preventDefault(); }
@@ -226,7 +222,7 @@ updateActionButton.addEventListener("click", (event) => {
   }
 });
 document.getElementById("quit")!.addEventListener("click", () => window.quotix.quit());
-document.getElementById("version")!.textContent = `hu@KwaN - v${__APP_VERSION__}`;
+document.getElementById("version")!.textContent = `v${__APP_VERSION__}`;
 
 const panel = document.querySelector(".panel")!;
 let lastHeight = 0;

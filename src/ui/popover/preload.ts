@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { DisplaySource, ProviderId } from "../quota/model";
-import type { ResetMode } from "../preferences";
+import type { DisplaySource, ProviderId } from "../../quota/model";
+import type { ResetMode } from "../../preferences";
 import type { PopoverPayload } from "./popoverState";
 
 export type UpdatePayload = PopoverPayload;
@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld("quotix", {
   setShowPaceLine: (value: boolean): void => { ipcRenderer.send("preferences:setShowPaceLine", value); },
   setOpenAtLogin: (value: boolean): void => { ipcRenderer.send("preferences:setOpenAtLogin", value); },
   refresh: (): void => { ipcRenderer.send("quota:refresh"); },
+  openAbout: (): void => { ipcRenderer.send("about:open"); },
   checkForUpdates: (): void => { ipcRenderer.send("update:check"); },
   downloadUpdate: (): void => { ipcRenderer.send("update:download"); },
   cancelUpdate: (): void => { ipcRenderer.send("update:cancel"); },

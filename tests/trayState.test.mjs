@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { trayDisplayState, trayWindowPresentation, trayWindowVisibility } from "../out/src/ui/trayState.js";
+import { trayDisplayState, trayWindowPresentation, trayWindowVisibility } from "../out/src/ui/tray/trayState.js";
 
 const quota = {
   updatedAt: 100,

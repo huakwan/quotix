@@ -9,7 +9,8 @@ const copyHtml = {
     const { mkdirSync } = require("node:fs");
     build.onEnd(() => {
       mkdirSync("dist", { recursive: true });
-      copyFileSync("src/ui/popover.html", "dist/popover.html");
+      copyFileSync("src/ui/popover/popover.html", "dist/popover.html");
+      copyFileSync("src/ui/about/about.html", "dist/about.html");
     });
   },
 };
@@ -27,12 +28,23 @@ async function main() {
       entryPoints: ["src/update/installerHelper.ts"],
       outfile: "dist/installerHelper.js",
     }),
-    esbuild.context({ ...node, entryPoints: ["src/ui/preload.ts"], outfile: "dist/preload.js" }),
+    esbuild.context({ ...node, entryPoints: ["src/ui/popover/preload.ts"], outfile: "dist/preload.js" }),
     esbuild.context({
-      entryPoints: ["src/ui/popoverRenderer.ts"], outfile: "dist/popoverRenderer.js",
+      ...node,
+      entryPoints: ["src/ui/about/aboutPreload.ts"],
+      outfile: "dist/aboutPreload.js",
+    }),
+    esbuild.context({
+      entryPoints: ["src/ui/popover/popoverRenderer.ts"], outfile: "dist/popoverRenderer.js",
       bundle: true, format: "iife", platform: "browser", target: "es2020",
       define: { __APP_VERSION__: JSON.stringify(pkg.version) },
       sourcemap: true, logLevel: "info", plugins: [copyHtml],
+    }),
+    esbuild.context({
+      entryPoints: ["src/ui/about/aboutRenderer.ts"], outfile: "dist/aboutRenderer.js",
+      bundle: true, format: "iife", platform: "browser", target: "es2020",
+      define: { __APP_VERSION__: JSON.stringify(pkg.version) },
+      sourcemap: true, logLevel: "info",
     }),
   ]);
   if (watch) {

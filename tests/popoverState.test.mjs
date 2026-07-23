@@ -7,7 +7,7 @@ import {
   sectionsForPayload,
   showMenuBarSetting,
   updatePresentation,
-} from "../out/src/ui/popoverState.js";
+} from "../out/src/ui/popover/popoverState.js";
 
 const missing = { enabled: false, loading: false, result: { ok: false, reason: "missing" }, lastGood: null };
 const quota = { updatedAt: 100, session: null, weekly: null, planDetected: false };

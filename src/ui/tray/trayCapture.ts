@@ -1,6 +1,6 @@
 import { trayWindowPresentation, type TrayDisplayState } from "./trayState";
-import anthropicIcon from "../../assets/anthropic.svg";
-import openaiIcon from "../../assets/openai.svg";
+import anthropicIcon from "../../../assets/anthropic.svg";
+import openaiIcon from "../../../assets/openai.svg";
 import pageTemplate from "./trayCapture.html";
 import { BrowserWindow, NativeImage, nativeImage } from "electron";
 

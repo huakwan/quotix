@@ -13,8 +13,8 @@ test("Codex icon is canonical black", () => {
 });
 
 test("popover adapts only the Codex icon to the active appearance", () => {
-  const renderer = readFileSync(join(root, "src/ui/popoverRenderer.ts"), "utf8");
-  const html = readFileSync(join(root, "src/ui/popover.html"), "utf8");
+  const renderer = readFileSync(join(root, "src/ui/popover/popoverRenderer.ts"), "utf8");
+  const html = readFileSync(join(root, "src/ui/popover/popover.html"), "utf8");
   assert.match(renderer, /provider === "codex" \? "logo codex-logo" : "logo"/);
   assert.match(html, /\.codex-logo\s*\{[^}]*filter:\s*invert\(1\)/s);
   assert.match(html, /prefers-color-scheme:\s*light[\s\S]*\.codex-logo\s*\{[^}]*filter:\s*none/s);
@@ -22,7 +22,7 @@ test("popover adapts only the Codex icon to the active appearance", () => {
 
 test("tray follows the active macOS appearance", () => {
   const main = readFileSync(join(root, "src/main.ts"), "utf8");
-  const tray = readFileSync(join(root, "src/ui/trayCapture.html"), "utf8");
+  const tray = readFileSync(join(root, "src/ui/tray/trayCapture.html"), "utf8");
 
   assert.match(
     main,
@@ -33,7 +33,7 @@ test("tray follows the active macOS appearance", () => {
 });
 
 test("tray provides explicit 1x and 2x canvas image representations", () => {
-  const source = readFileSync(join(root, "src/ui/trayCapture.ts"), "utf8");
+  const source = readFileSync(join(root, "src/ui/tray/trayCapture.ts"), "utf8");
 
   assert.match(source, /window\.__renderCanvas/);
   assert.match(source, /addRepresentation\(\{\s*scaleFactor:\s*1/);
@@ -42,7 +42,7 @@ test("tray provides explicit 1x and 2x canvas image representations", () => {
 });
 
 test("tray forces a single 1x image on macOS 12 and serializes canvas rendering", () => {
-  const source = readFileSync(join(root, "src/ui/trayCapture.ts"), "utf8");
+  const source = readFileSync(join(root, "src/ui/tray/trayCapture.ts"), "utf8");
 
   assert.match(
     source,
@@ -53,8 +53,8 @@ test("tray forces a single 1x image on macOS 12 and serializes canvas rendering"
 });
 
 test("tray renders through canvas instead of capturing a hidden GPU surface", () => {
-  const source = readFileSync(join(root, "src/ui/trayCapture.ts"), "utf8");
-  const html = readFileSync(join(root, "src/ui/trayCapture.html"), "utf8");
+  const source = readFileSync(join(root, "src/ui/tray/trayCapture.ts"), "utf8");
+  const html = readFileSync(join(root, "src/ui/tray/trayCapture.html"), "utf8");
 
   assert.match(html, /canvas\.toDataURL\("image\/png"\)/);
   assert.match(html, /oneX:\s*paint\(1\),\s*twoX:\s*paint\(2\)/);

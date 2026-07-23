@@ -25,7 +25,7 @@ test("electron-builder keeps packaged output outside compiled app files", () => 
     {
       from: "assets",
       to: "assets",
-      filter: ["anthropic.svg", "openai.svg"],
+      filter: ["anthropic.svg", "openai.svg", "about-poster.png", "promptpay.png"],
     },
   ]);
   assert.deepEqual(pkg.build.electronLanguages, ["en", "th"]);

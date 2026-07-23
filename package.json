@@ -1,6 +1,6 @@
 {
   "name": "quotix",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Show Claude Code and Codex usage quota in the macOS menu bar.",
   "license": "MIT",
   "private": true,
@@ -42,7 +42,9 @@
         "to": "assets",
         "filter": [
           "anthropic.svg",
-          "openai.svg"
+          "openai.svg",
+          "about-poster.png",
+          "promptpay.png"
         ]
       }
     ],
@@ -65,9 +67,11 @@
   },
   "devDependencies": {
     "@types/node": "^26.1.0",
+    "@types/qrcode": "^1.5.6",
     "electron": "^43.1.1",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.1",
+    "qrcode": "^1.5.4",
     "typescript": "^6.0.3"
   },
   "dependencies": {

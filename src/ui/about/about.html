@@ -1,0 +1,290 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self';"
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --panel: #090d13;
+        --surface: rgba(17, 25, 36, 0.9);
+        --border: rgba(117, 210, 255, 0.19);
+        --fg: #f4f8fc;
+        --muted: #9aa9b8;
+        --cyan: #58d9ff;
+        --amber: #ffb13b;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: transparent;
+      }
+      body {
+        padding: 10px;
+        color: var(--fg);
+        font:
+          13px -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      .window {
+        position: relative;
+        height: 100%;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background:
+          radial-gradient(
+            circle at 88% 5%,
+            rgba(62, 185, 255, 0.14),
+            transparent 34%
+          ),
+          var(--panel);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.58);
+      }
+      .drag {
+        position: absolute;
+        z-index: 3;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 28px;
+        -webkit-app-region: drag;
+      }
+      .poster {
+        position: relative;
+        height: 168px;
+        overflow: hidden;
+        border-bottom: 1px solid var(--border);
+      }
+      .poster::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          90deg,
+          rgba(5, 8, 13, 0.5),
+          transparent 55%
+        );
+        pointer-events: none;
+      }
+      .poster img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      .brand {
+        position: absolute;
+        z-index: 2;
+        left: 24px;
+        bottom: 22px;
+      }
+      .eyebrow {
+        color: var(--cyan);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      h1 {
+        margin: 4px 0 0;
+        font-size: 32px;
+        line-height: 1;
+        letter-spacing: -0.04em;
+      }
+      .content {
+        padding: 18px 20px 16px;
+      }
+      .meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .author {
+        color: var(--muted);
+        line-height: 1.4;
+      }
+      .author strong {
+        color: var(--fg);
+        font-weight: 650;
+      }
+      .version {
+        flex: none;
+        padding: 5px 9px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        color: var(--cyan);
+        background: rgba(66, 195, 255, 0.07);
+        font-size: 10px;
+        font-variant-numeric: tabular-nums;
+      }
+      .donate {
+        display: grid;
+        grid-template-columns: 174px 1fr;
+        align-items: center;
+        gap: 16px;
+        padding: 14px;
+        border: 1px solid var(--border);
+        border-radius: 15px;
+        background:
+          linear-gradient(
+            135deg,
+            rgba(70, 215, 255, 0.06),
+            rgba(255, 164, 45, 0.07)
+          ),
+          var(--surface);
+      }
+      .qr-shell {
+        width: 174px;
+        height: 174px;
+        background: transparent;
+        filter: drop-shadow(0 0 12px rgba(81, 211, 255, 0.16));
+      }
+      canvas {
+        width: 174px;
+        height: 174px;
+        display: block;
+      }
+      .coffee-icon {
+        width: 31px;
+        height: 31px;
+        margin-bottom: 9px;
+        color: var(--amber);
+      }
+      .donate h2 {
+        margin: 0;
+        font-size: 17px;
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+      }
+      .donate p {
+        margin: 7px 0 0;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.45;
+      }
+      .phone {
+        display: block;
+        margin-top: 8px;
+        color: var(--fg);
+        font-size: 12px;
+        font-weight: 650;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.04em;
+      }
+      .bank-note {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 9px;
+        color: var(--cyan);
+        font-size: 10px;
+        line-height: 1.3;
+      }
+      .promptpay-logo {
+        width: 63px;
+        height: auto;
+        display: block;
+        flex: none;
+        padding: 2px 4px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.96);
+      }
+      .close {
+        width: 100%;
+        height: 36px;
+        margin-top: 14px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        color: var(--fg);
+        background: rgba(255, 255, 255, 0.06);
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        -webkit-app-region: no-drag;
+      }
+      .close:hover {
+        border-color: rgba(117, 210, 255, 0.38);
+        background: rgba(88, 217, 255, 0.11);
+      }
+      .close:focus-visible {
+        outline: 2px solid var(--cyan);
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="window">
+      <div class="drag" aria-hidden="true"></div>
+      <section class="poster">
+        <img src="../assets/about-poster.png" alt="" />
+        <div class="brand">
+          <div class="eyebrow">AI quota monitor</div>
+          <h1>Quotix</h1>
+        </div>
+      </section>
+      <section class="content">
+        <div class="meta">
+          <div class="author">Crafted by <strong>hu@KwaN</strong></div>
+          <div class="version" id="version"></div>
+        </div>
+        <div class="donate">
+          <div class="qr-shell">
+            <canvas
+              id="promptpay-qr"
+              role="img"
+              aria-label="PromptPay donation QR code"
+            ></canvas>
+          </div>
+          <div>
+            <svg
+              class="coffee-icon"
+              viewBox="0 0 32 32"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M7 11h16v7a8 8 0 0 1-8 8 8 8 0 0 1-8-8v-7Z"
+                stroke="currentColor"
+                stroke-width="2"
+              />
+              <path
+                d="M23 14h2a3 3 0 0 1 0 6h-2M5 27h21M11 8c-2-2 2-3 0-5M17 8c-2-2 2-3 0-5"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+            </svg>
+            <h2>Buy me a coffee</h2>
+            <p>Scan with mobile banking app and choose any amount.</p>
+            <span class="phone">090-xxx-1123</span>
+            <div class="bank-note">
+              <img
+                class="promptpay-logo"
+                src="../assets/promptpay.png"
+                alt="PromptPay"
+              />
+            </div>
+          </div>
+        </div>
+        <button class="close" id="close" type="button">Close</button>
+      </section>
+    </main>
+    <script src="aboutRenderer.js"></script>
+  </body>
+</html>

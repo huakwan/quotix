@@ -1,6 +1,6 @@
-import type { ProviderId, Quota, QuotaSnapshot, QuotaWindow, SourceState } from "../quota/model";
-import type { Preferences } from "../preferences";
-import type { UpdateViewState } from "../update/model";
+import type { ProviderId, Quota, QuotaSnapshot, QuotaWindow, SourceState } from "../../quota/model";
+import type { Preferences } from "../../preferences";
+import type { UpdateViewState } from "../../update/model";
 
 export interface PopoverPayload {
   snapshot: QuotaSnapshot;

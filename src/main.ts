@@ -35,9 +35,9 @@ import {
   savePreferences,
   type Preferences,
 } from "./preferences";
-import { createPopover, resizePopover, togglePopover } from "./ui/popoverWindow";
-import { renderTray } from "./ui/trayCapture";
-import { trayDisplayState } from "./ui/trayState";
+import { createPopover, resizePopover, togglePopover } from "./ui/popover/popoverWindow";
+import { renderTray } from "./ui/tray/trayCapture";
+import { trayDisplayState } from "./ui/tray/trayState";
 import { UpdateCoordinator } from "./update/coordinator";
 import { acknowledgeUpdatedLaunch, installVerifiedUpdate } from "./update/installer";
 import { resolveInstalledBundle } from "./update/installPaths";
@@ -46,6 +46,7 @@ import { recoverInterruptedUpdates } from "./update/recovery";
 import { ReleaseChecker } from "./update/releaseChecker";
 import { stageUpdate } from "./update/stager";
 import updatePublicKey from "./update/key/quotix-update-public.pem";
+import { createAboutWindow } from "./ui/about/aboutWindow";
 
 const REFRESH_INTERVAL_SECONDS = 2 * 60;
 const UPDATE_CHECK_INTERVAL_MS = 3 * 60 * 60 * 1000;
@@ -53,6 +54,7 @@ const UPDATE_STARTUP_DELAY_MS = 30 * 1000;
 
 let tray: Tray | undefined;
 let popover: BrowserWindow | undefined;
+let aboutWindow: BrowserWindow | undefined;
 let coordinator: QuotaCoordinator | undefined;
 let preferences: Preferences;
 let pollTimer: NodeJS.Timeout | undefined;
@@ -127,9 +129,27 @@ function checkForUpdates(manual: boolean): void {
   ignoreUpdateAction(updateCoordinator?.check(manual));
 }
 
+function showAbout(): void {
+  if (aboutWindow && !aboutWindow.isDestroyed()) {
+    aboutWindow.show();
+    aboutWindow.focus();
+    return;
+  }
+  aboutWindow = createAboutWindow();
+  aboutWindow.once("closed", () => { aboutWindow = undefined; });
+}
+
 function registerIpc(): void {
   ipcMain.on("quota:refresh", () => poll(true));
   ipcMain.on("quota:quit", () => app.quit());
+  ipcMain.on("about:open", (event) => {
+    if (popover && event.sender === popover.webContents) { showAbout(); }
+  });
+  ipcMain.on("about:close", (event) => {
+    if (aboutWindow && !aboutWindow.isDestroyed() && event.sender === aboutWindow.webContents) {
+      aboutWindow.close();
+    }
+  });
   ipcMain.on("update:check", () => checkForUpdates(true));
   ipcMain.on("update:download", () => ignoreUpdateAction(updateCoordinator?.download()));
   ipcMain.on("update:cancel", () => updateCoordinator?.cancel());

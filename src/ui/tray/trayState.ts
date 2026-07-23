@@ -1,4 +1,4 @@
-import type { ProviderId, SourceState } from "../quota/model";
+import type { ProviderId, SourceState } from "../../quota/model";
 
 export interface TrayDisplayState {
   provider: ProviderId;
