@@ -107,15 +107,21 @@ jobs:
           test -n "$app_path"
           actual_arch="$(lipo -archs "$app_path/Contents/MacOS/Quotix")"
           test "$actual_arch" = "$BINARY_ARCH"
+          actual_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app_path/Contents/Info.plist")"
+          test "$actual_version" = "${RELEASE_TAG#v}"
           safe_tag="${RELEASE_TAG//\//-}"
           asset_path="Quotix-${safe_tag}-macos-${ARCH}.zip"
           ditto -c -k --sequesterRsrc --keepParent "$app_path" "$asset_path"
+          node -e 'const fs=require("node:fs");const [version,arch,binaryArch]=process.argv.slice(1);fs.writeFileSync(`build-info-${arch}.json`,JSON.stringify({version,arch,binaryArch}))' \
+            "$actual_version" "$ARCH" "$actual_arch"
 
       - name: Store app archive
         uses: actions/upload-artifact@v6
         with:
           name: macos-${{ matrix.arch }}
-          path: Quotix-*-macos-${{ matrix.arch }}.zip
+          path: |
+            Quotix-*-macos-${{ matrix.arch }}.zip
+            build-info-${{ matrix.arch }}.json
           if-no-files-found: error
           retention-days: 1
 
@@ -126,12 +132,29 @@ jobs:
       contents: write
 
     steps:
+      - name: Check out release tooling
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
       - name: Download app archives
         uses: actions/download-artifact@v7
         with:
           pattern: macos-*
           path: release-assets
           merge-multiple: true
+
+      - name: Create and verify signed update manifest
+        env:
+          UPDATE_SIGNING_PRIVATE_KEY: ${{ secrets.UPDATE_SIGNING_PRIVATE_KEY }}
+          RELEASE_TAG: ${{ needs.prepare-release.outputs.release_tag }}
+        run: |
+          node scripts/create-update-manifest.mjs \
+            --assets-dir release-assets \
+            --output-dir release-assets \
+            --tag "$RELEASE_TAG" \
+            --public-key src/update/update-public-key.pem
 
       - name: Create release with app archives
         env:
@@ -141,12 +164,18 @@ jobs:
           TARGET_SHA: ${{ github.sha }}
         run: |
           shopt -s nullglob
-          assets=(release-assets/*.zip)
-          test "${#assets[@]}" -eq 2
+          assets=(
+            release-assets/*.zip
+            release-assets/quotix-update.json
+            release-assets/quotix-update.json.sig
+          )
+          test "${#assets[@]}" -eq 4
           existing_release_id="$(gh api --paginate "repos/${GH_REPO}/releases?per_page=100" --jq ".[] | select(.tag_name == \"${RELEASE_TAG}\") | .id" | head -n 1)"
           test -z "$existing_release_id"
           cat > release-body.md <<'RELEASE_BODY'
-          ### macOS blocks the app?
+          ### macOS blocks the app? / macOS ไม่ยอมเปิดแอป?
+
+          **English**
 
           If you downloaded Quotix from this official GitHub release and macOS prevents it from opening, move the app to `/Applications`, then run:
 
@@ -157,7 +186,9 @@ jobs:
 
           This removes macOS quarantine metadata from this copy of Quotix. Only run these commands for an app downloaded from this official release.
 
-          ### macOS ไม่ยอมเปิดแอป?
+          Starting with the first updater-enabled release, Quotix can check for new versions and download them only when you press Download. It asks again before removing quarantine from the verified staged copy and installing it. Version 1.0.6 must be upgraded manually once.
+
+          **ภาษาไทย**
 
           หากดาวน์โหลด Quotix จาก GitHub Release อย่างเป็นทางการนี้แล้ว macOS ไม่ยอมเปิดแอป ให้ย้ายแอปไปที่ `/Applications` แล้วรัน:
 
@@ -167,6 +198,8 @@ jobs:
           ```
 
           คำสั่งนี้จะลบข้อมูล quarantine ของ macOS ออกจาก Quotix ชุดนี้ โปรดรันเฉพาะกับแอปที่ดาวน์โหลดจาก Release อย่างเป็นทางการนี้เท่านั้น
+
+          ตั้งแต่ release แรกที่รองรับ updater เป็นต้นไป Quotix จะตรวจเวอร์ชันใหม่และดาวน์โหลดเฉพาะเมื่อผู้ใช้กด Download จากนั้นจะถามยืนยันอีกครั้งก่อนลบ quarantine จากไฟล์ที่ตรวจสอบแล้วและติดตั้ง ผู้ใช้เวอร์ชัน 1.0.6 ต้องอัปเกรดด้วยตนเองหนึ่งครั้ง
           RELEASE_BODY
           gh api --silent --method POST "repos/${GH_REPO}/git/refs" \
             -f ref="refs/tags/${RELEASE_TAG}" \

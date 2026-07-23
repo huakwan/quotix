@@ -9,3 +9,8 @@ release/
 
 !CLAUDE.md
 !Makefile
+
+# Private update-signing keys
+*update-signing-private*.pem
+*.private.pem
+private-key.pem
