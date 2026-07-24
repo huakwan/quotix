@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rename, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -29,8 +29,6 @@ function transaction() {
 function fakeDeps(options = {}) {
   const calls = [];
   let marker = false;
-  let backupCleanupFailures = options.backupCleanupFailures
-    ?? (options.failBackupCleanup ? Number.POSITIVE_INFINITY : 0);
   return {
     calls,
     deps: {
@@ -41,12 +39,10 @@ function fakeDeps(options = {}) {
       },
       rm: async (path) => {
         calls.push(["rm", path]);
-        if (backupCleanupFailures > 0 && path.includes("update-backup")) {
-          backupCleanupFailures -= 1;
-          throw new Error("backup cleanup failed");
-        }
       },
-      writeTransaction: async (value) => { calls.push(["phase", value.phase]); },
+      writeTransaction: async (value) => {
+        calls.push(["phase", value.phase, value.helperPid]);
+      },
       writeResult: async (value) => { calls.push(["result", value]); },
       launch: async (path, args) => {
         calls.push(["launch", path, args]);
@@ -62,19 +58,22 @@ function fakeDeps(options = {}) {
         let now = 0;
         return () => { now += options.marker === false ? 31_000 : 1; return now; };
       })(),
+      processId: 999,
     },
   };
 }
 
-test("installer helper replaces, validates, and then removes backup", async () => {
+test("installer helper replaces and validates before leaving cleanup to the new app", async () => {
   const { deps, calls } = fakeDeps();
   await runInstallTransaction(transaction(), deps);
   assert.deepEqual(calls.filter(([name]) => name === "rename"), [
     ["rename", "/Applications/Quotix.app", "/Applications/Quotix.app.update-backup-aaaaaaaaaaaa"],
     ["rename", "/tmp/update/Quotix.app", "/Applications/Quotix.app"],
   ]);
-  assert.ok(calls.some(([name, path]) => name === "rm" && path.includes("update-backup")));
+  assert.equal(calls.some(([name, path]) => name === "rm" && path.includes("update-backup")), false);
   assert.ok(calls.some(([name, result]) => name === "result" && result.status === "success"));
+  assert.ok(calls.some(([name, phase, helperPid]) =>
+    name === "phase" && phase === "complete" && helperPid === 999));
 });
 
 test("installer helper rolls back launch failure and marker timeout", async () => {
@@ -99,32 +98,6 @@ test("installer helper restores backup when moving the staged app fails", async 
     call[0] === "rename"
     && call[1] === tx.backupApp
     && call[2] === tx.installedApp));
-});
-
-test("installer helper keeps the successful new app when backup cleanup fails", async () => {
-  const { deps, calls } = fakeDeps({ failBackupCleanup: true });
-  await runInstallTransaction(transaction(), deps);
-  assert.ok(calls.some(([name, result]) => name === "result" && result.status === "success"));
-  assert.equal(
-    calls.some((call) =>
-      call[0] === "rename"
-      && call[1].includes("update-backup")
-      && call[2] === "/Applications/Quotix.app"),
-    false,
-  );
-  assert.equal(
-    calls.filter(([name, path]) => name === "rm" && path.includes("update-backup")).length,
-    3,
-  );
-});
-
-test("installer helper retries a transient backup cleanup failure", async () => {
-  const { deps, calls } = fakeDeps({ backupCleanupFailures: 1 });
-  await runInstallTransaction(transaction(), deps);
-  assert.equal(
-    calls.filter(([name, path]) => name === "rm" && path.includes("update-backup")).length,
-    2,
-  );
 });
 
 test("installer helper does not roll back a healthy app for post-marker bookkeeping failure", async () => {
@@ -214,8 +187,9 @@ test("installer helper replaces an app using the real filesystem transaction", a
     readMarker: async () => marker,
     wait: async () => undefined,
     now: Date.now,
+    processId: 999,
   });
   assert.equal(await readFile(join(installedApp, "version"), "utf8"), "new");
-  await assert.rejects(() => stat(tx.backupApp));
+  assert.equal(await readFile(join(tx.backupApp, "version"), "utf8"), "old");
   assert.equal(JSON.parse(await readFile(tx.resultPath, "utf8")).status, "success");
 });

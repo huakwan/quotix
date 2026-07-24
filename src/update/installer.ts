@@ -131,7 +131,11 @@ export async function acknowledgeUpdatedLaunch(
   argv: string[],
   userDataDir: string,
   currentVersion: string,
-): Promise<{ markerPath: string; transactionPath: string } | null> {
+): Promise<{
+  markerPath: string;
+  transactionPath: string;
+  helperPid?: number;
+} | null> {
   const token = argumentValue(argv, "--quotix-update-token");
   const marker = argumentValue(argv, "--quotix-update-marker");
   if (!token && !marker) { return null; }
@@ -170,5 +174,72 @@ export async function acknowledgeUpdatedLaunch(
     throw new UpdateError("launch_acknowledgement_invalid");
   }
   await writeFile(marker, token, { mode: 0o600, flag: "wx" });
-  return { markerPath: marker, transactionPath };
+  return {
+    markerPath: marker,
+    transactionPath,
+    ...(transaction.helperPid ? { helperPid: transaction.helperPid } : {}),
+  };
+}
+
+export interface InstallerExitWaitOptions {
+  helperPid?: number;
+  transactionPath: string;
+  timeoutMs?: number;
+  pollMs?: number;
+  probeProcess?(
+    helperPid: number | undefined,
+    transactionPath: string,
+  ): Promise<"running" | "exited" | "unknown">;
+  wait?(milliseconds: number): Promise<void>;
+  now?(): number;
+}
+
+function pidExists(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== "ESRCH";
+  }
+}
+
+async function probeInstallerProcess(
+  helperPid: number | undefined,
+  transactionPath: string,
+): Promise<"running" | "exited" | "unknown"> {
+  const args = helperPid
+    ? ["-ww", "-p", String(helperPid), "-o", "command="]
+    : ["-ww", "-axo", "command="];
+  try {
+    const { stdout } = await execFileAsync("/bin/ps", args, {
+      encoding: "utf8",
+      maxBuffer: 8 * 1024 * 1024,
+    });
+    return stdout.split("\n").some((command) => command.includes(transactionPath))
+      ? "running"
+      : "exited";
+  } catch {
+    if (helperPid && !pidExists(helperPid)) { return "exited"; }
+    return "unknown";
+  }
+}
+
+export async function waitForInstallerExit(
+  options: InstallerExitWaitOptions,
+): Promise<boolean> {
+  const timeoutMs = options.timeoutMs ?? 10_000;
+  const pollMs = options.pollMs ?? 100;
+  const probeProcess = options.probeProcess ?? probeInstallerProcess;
+  const wait = options.wait
+    ?? ((milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
+  const now = options.now ?? Date.now;
+  const started = now();
+
+  while (now() - started < timeoutMs) {
+    if (await probeProcess(options.helperPid, options.transactionPath) === "exited") {
+      return true;
+    }
+    await wait(pollMs);
+  }
+  return false;
 }

@@ -39,7 +39,11 @@ import { createPopover, resizePopover, togglePopover } from "./ui/popover/popove
 import { renderTray } from "./ui/tray/trayCapture";
 import { trayDisplayState } from "./ui/tray/trayState";
 import { UpdateCoordinator } from "./update/coordinator";
-import { acknowledgeUpdatedLaunch, installVerifiedUpdate } from "./update/installer";
+import {
+  acknowledgeUpdatedLaunch,
+  installVerifiedUpdate,
+  waitForInstallerExit,
+} from "./update/installer";
 import { resolveInstalledBundle } from "./update/installPaths";
 import type { UpdateArch } from "./update/model";
 import {
@@ -328,12 +332,17 @@ app.whenReady().then(async () => {
       userDataDir,
       app.getVersion(),
     );
+    const installerExited = acknowledged
+      ? await waitForInstallerExit(acknowledged)
+      : true;
     const installed = await resolveInstalledBundle(process.execPath);
     const notices = await recoverInterruptedUpdates({
       updatesRoot,
       currentBundlePath: installed.eligible ? installed.bundlePath : undefined,
       currentVersion: app.getVersion(),
-      skipTransactionPath: acknowledged?.transactionPath,
+      skipTransactionPath: acknowledged && !installerExited
+        ? acknowledged.transactionPath
+        : undefined,
     });
     await cleanupOrphanedUpdateBackups({
       updatesRoot,

@@ -23,6 +23,7 @@ export interface InstallerHelperDeps {
   readMarker(): Promise<string | null>;
   wait(milliseconds: number): Promise<void>;
   now(): number;
+  processId: number;
 }
 
 function executablePath(appPath: string): string {
@@ -43,20 +44,6 @@ async function waitForMarker(
   throw new UpdateError("updated_launch_timeout");
 }
 
-async function removeBackup(
-  path: string,
-  deps: InstallerHelperDeps,
-): Promise<void> {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      await deps.rm(path);
-      return;
-    } catch {
-      if (attempt < 2) { await deps.wait(250); }
-    }
-  }
-}
-
 export async function runInstallTransaction(
   transaction: InstallTransaction,
   deps: InstallerHelperDeps,
@@ -67,6 +54,7 @@ export async function runInstallTransaction(
   let originalExited = false;
   let child: LaunchedProcess | undefined;
   try {
+    tx.helperPid = deps.processId;
     await deps.waitForExit(tx.originalPid);
     originalExited = true;
     await deps.rename(tx.installedApp, tx.backupApp);
@@ -115,7 +103,6 @@ export async function runInstallTransaction(
   tx.phase = "complete";
   await deps.writeTransaction(tx).catch(() => undefined);
   await deps.writeResult({ status: "success", version: tx.version }).catch(() => undefined);
-  await removeBackup(tx.backupApp, deps);
 }
 
 async function waitForExit(pid: number): Promise<void> {
@@ -173,6 +160,7 @@ async function main(): Promise<void> {
     },
     wait: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
     now: Date.now,
+    processId: process.pid,
   };
   await runInstallTransaction(tx, deps);
 }

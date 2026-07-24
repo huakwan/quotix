@@ -8,6 +8,7 @@ import {
   acknowledgeUpdatedLaunch,
   installVerifiedUpdate,
   removeVerifiedQuarantine,
+  waitForInstallerExit,
 } from "../out/src/update/installer.js";
 
 test("installer never removes quarantine without consent", async () => {
@@ -134,4 +135,78 @@ test("installer does not quit until helper startup is confirmed", async () => {
     quit: () => { quit = true; },
   }), /spawn failed/);
   assert.equal(quit, false);
+});
+
+test("new app waits for the current helper process to exit before cleanup", async () => {
+  const statuses = ["running", "exited"];
+  let now = 0;
+  let waits = 0;
+  const exited = await waitForInstallerExit({
+    helperPid: 456,
+    transactionPath: "/tmp/update/install-transaction.json",
+    probeProcess: async (pid, transactionPath) => {
+      assert.equal(pid, 456);
+      assert.equal(transactionPath, "/tmp/update/install-transaction.json");
+      return statuses.shift() ?? "exited";
+    },
+    wait: async () => {
+      waits += 1;
+      now += 100;
+    },
+    now: () => now,
+  });
+  assert.equal(exited, true);
+  assert.equal(waits, 1);
+});
+
+test("new app waits for the exact legacy helper process to exit", async () => {
+  const statuses = ["running", "exited"];
+  let now = 0;
+  const exited = await waitForInstallerExit({
+    transactionPath: "/tmp/update/install-transaction.json",
+    probeProcess: async (pid, transactionPath) => {
+      assert.equal(pid, undefined);
+      assert.equal(transactionPath, "/tmp/update/install-transaction.json");
+      return statuses.shift() ?? "exited";
+    },
+    wait: async (milliseconds) => { now += milliseconds; },
+    now: () => now,
+  });
+  assert.equal(exited, true);
+  assert.equal(now, 100);
+});
+
+test("new app preserves the live backup when helper exit times out", async () => {
+  let now = 0;
+  const exited = await waitForInstallerExit({
+    helperPid: 456,
+    transactionPath: "/tmp/update/install-transaction.json",
+    timeoutMs: 300,
+    probeProcess: async () => "running",
+    wait: async (milliseconds) => { now += milliseconds; },
+    now: () => now,
+  });
+  assert.equal(exited, false);
+});
+
+test("new app treats a reused helper PID with another command as exited", async () => {
+  const exited = await waitForInstallerExit({
+    helperPid: 456,
+    transactionPath: "/tmp/update/install-transaction.json",
+    probeProcess: async () => "exited",
+  });
+  assert.equal(exited, true);
+});
+
+test("new app fails closed when installer process identity cannot be checked", async () => {
+  let now = 0;
+  const exited = await waitForInstallerExit({
+    helperPid: 456,
+    transactionPath: "/tmp/update/install-transaction.json",
+    timeoutMs: 200,
+    probeProcess: async () => "unknown",
+    wait: async (milliseconds) => { now += milliseconds; },
+    now: () => now,
+  });
+  assert.equal(exited, false);
 });

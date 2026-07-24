@@ -83,15 +83,19 @@ test("startup recovery completes a launched current version and removes its back
   assert.equal(await pathExists(value.stagingRoot), false);
 });
 
-test("startup recovery leaves the helper's acknowledged transaction untouched", async () => {
+test("startup recovery preserves a transaction while its helper is still running", async () => {
   const value = await fixture("launching");
   await mkdir(value.installedApp, { recursive: true });
+  await mkdir(value.transaction.backupApp, { recursive: true });
+
   await recoverInterruptedUpdates({
     updatesRoot: value.updatesRoot,
     currentBundlePath: value.installedApp,
     currentVersion: "1.0.7",
     skipTransactionPath: join(value.stagingRoot, "install-transaction.json"),
   });
+
+  assert.equal(await pathExists(value.transaction.backupApp), true);
   assert.equal(await pathExists(value.stagingRoot), true);
 });
 

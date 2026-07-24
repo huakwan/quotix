@@ -24,6 +24,7 @@ export interface InstallTransaction {
   resultPath: string;
   token: string;
   originalPid: number;
+  helperPid?: number;
   phase: InstallPhase;
 }
 
@@ -58,8 +59,11 @@ export function parseInstallTransaction(value: unknown): InstallTransaction {
     "schemaVersion", "version", "stagingRoot", "installedApp", "stagedApp",
     "backupApp", "markerPath", "resultPath", "token", "originalPid", "phase",
   ];
+  const actualKeys = Object.keys(tx).sort().join(",");
+  const legacyKeys = expectedKeys.sort().join(",");
+  const currentKeys = [...expectedKeys, "helperPid"].sort().join(",");
   if (
-    Object.keys(tx).sort().join(",") !== expectedKeys.sort().join(",")
+    (actualKeys !== legacyKeys && actualKeys !== currentKeys)
     || tx.schemaVersion !== 1
     || typeof tx.version !== "string"
     || !parseAppVersion(tx.version)
@@ -73,6 +77,8 @@ export function parseInstallTransaction(value: unknown): InstallTransaction {
     || !/^[a-f0-9]{64}$/.test(tx.token)
     || !Number.isSafeInteger(tx.originalPid)
     || (tx.originalPid ?? 0) <= 0
+    || (tx.helperPid !== undefined
+      && (!Number.isSafeInteger(tx.helperPid) || tx.helperPid <= 0))
     || !["prepared", "backup-created", "new-installed", "launching", "complete", "rolled-back"]
       .includes(tx.phase ?? "")
   ) {
