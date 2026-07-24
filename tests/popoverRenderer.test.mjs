@@ -125,6 +125,18 @@ test("about action sits beside refresh and uses a narrow preload API", () => {
   assert.match(main, /event\.sender === aboutWindow\.webContents/);
 });
 
+test("refresh button disables immediately and follows provider request state", () => {
+  const renderer = readFileSync(join(root, "src/ui/popover/popoverRenderer.ts"), "utf8");
+  const preload = readFileSync(join(root, "src/ui/popover/preload.ts"), "utf8");
+  const html = readFileSync(join(root, "src/ui/popover/popover.html"), "utf8");
+
+  assert.match(renderer, /refreshButton\.disabled = refreshPending \|\| isQuotaRefreshInProgress\(last\)/);
+  assert.match(renderer, /refreshButton\.disabled = true;\s*window\.quotix\.refresh\(\)/);
+  assert.match(renderer, /window\.quotix\.refresh\(\)[\s\S]*?finally\(\(\) => \{[\s\S]*?refreshPending = false;[\s\S]*?draw\(\)/);
+  assert.match(preload, /refresh: \(\): Promise<void> => ipcRenderer\.invoke\("quota:refresh"\)/);
+  assert.match(html, /\.icon-btn:disabled/);
+});
+
 test("about donation card keeps the QR anonymous on screen and transparent", () => {
   const html = readFileSync(join(root, "src/ui/about/about.html"), "utf8");
   const renderer = readFileSync(join(root, "src/ui/about/aboutRenderer.ts"), "utf8");

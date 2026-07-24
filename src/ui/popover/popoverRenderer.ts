@@ -1,4 +1,13 @@
-import { canActivateUpdateAction, quotaRowsForProvider, sectionsForPayload, showMenuBarSetting, updatePresentation, type PopoverPayload, type UpdateAction, } from "./popoverState";
+import {
+  canActivateUpdateAction,
+  isQuotaRefreshInProgress,
+  quotaRowsForProvider,
+  sectionsForPayload,
+  showMenuBarSetting,
+  updatePresentation,
+  type PopoverPayload,
+  type UpdateAction,
+} from "./popoverState";
 import type { DisplaySource, ProviderId, QuotaWindow, SourceState } from "../../quota/model";
 import type { ResetMode } from "../../preferences";
 import { keepButtonsUnfocused } from "../buttonFocus";
@@ -11,7 +20,7 @@ declare global {
     setResetMode(mode: ResetMode): void;
     setShowPaceLine(value: boolean): void;
     setOpenAtLogin(value: boolean): void;
-    refresh(): void;
+    refresh(): Promise<void>;
     openAbout(): void;
     checkForUpdates(): void;
     downloadUpdate(): void;
@@ -31,6 +40,7 @@ declare const __APP_VERSION__: string;
 
 let last: PopoverPayload | null = null;
 let currentUpdateAction: UpdateAction | null = null;
+let refreshPending = false;
 
 function colorClass(pct: number): "green" | "amber" | "red" {
   if (pct > 90) { return "red"; }
@@ -174,6 +184,9 @@ function draw(): void {
   syncButtons("pace-mode", last.preferences.showPaceLine ? "on" : "off");
   syncButtons("login-mode", last.preferences.openAtLogin ? "on" : "off");
   document.getElementById("menu-source-row")!.classList.toggle("hidden", !showMenuBarSetting(last.preferences));
+  const refreshButton = document.getElementById("refresh")! as HTMLButtonElement;
+  refreshButton.disabled = refreshPending || isQuotaRefreshInProgress(last);
+  refreshButton.title = refreshButton.disabled ? "Refreshing…" : "Refresh now";
   const update = updatePresentation(last.update ?? { status: "idle" });
   const updateRow = document.getElementById("update-row")!;
   const updateLabel = document.getElementById("update-label")!;
@@ -210,7 +223,18 @@ onSegment("menu-source", (value) => window.quotix.setMenuBarSource(value as Prov
 onSegment("reset-mode", (value) => window.quotix.setResetMode(value as ResetMode));
 onSegment("pace-mode", (value) => window.quotix.setShowPaceLine(value === "on"));
 onSegment("login-mode", (value) => window.quotix.setOpenAtLogin(value === "on"));
-document.getElementById("refresh")!.addEventListener("click", () => window.quotix.refresh());
+const refreshButton = document.getElementById("refresh")! as HTMLButtonElement;
+refreshButton.addEventListener("click", () => {
+  if (refreshPending) { return; }
+  refreshPending = true;
+  refreshButton.disabled = true;
+  window.quotix.refresh()
+    .catch(() => undefined)
+    .finally(() => {
+      refreshPending = false;
+      draw();
+    });
+});
 document.getElementById("about")!.addEventListener("click", () => window.quotix.openAbout());
 const updateActionButton = document.getElementById("update-action")!;
 updateActionButton.addEventListener("click", (event) => {

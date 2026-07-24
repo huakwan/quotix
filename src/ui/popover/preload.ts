@@ -14,7 +14,7 @@ contextBridge.exposeInMainWorld("quotix", {
   setResetMode: (mode: ResetMode): void => { ipcRenderer.send("preferences:setResetMode", mode); },
   setShowPaceLine: (value: boolean): void => { ipcRenderer.send("preferences:setShowPaceLine", value); },
   setOpenAtLogin: (value: boolean): void => { ipcRenderer.send("preferences:setOpenAtLogin", value); },
-  refresh: (): void => { ipcRenderer.send("quota:refresh"); },
+  refresh: (): Promise<void> => ipcRenderer.invoke("quota:refresh"),
   openAbout: (): void => { ipcRenderer.send("about:open"); },
   checkForUpdates: (): void => { ipcRenderer.send("update:check"); },
   downloadUpdate: (): void => { ipcRenderer.send("update:download"); },

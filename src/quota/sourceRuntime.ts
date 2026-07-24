@@ -17,6 +17,7 @@ export class SourceRuntime {
   private inFlight: Promise<void> | null = null;
   private consecutiveRateLimits = 0;
   private backoffUntilMs = 0;
+  private manualBackoffBypassUsed = false;
   private listeners = new Set<(state: SourceState) => void>();
 
   constructor(
@@ -41,20 +42,25 @@ export class SourceRuntime {
     return () => { this.listeners.delete(listener); };
   }
 
-  poll(_force = false): Promise<void> {
+  poll(force = false): Promise<void> {
     if (this.inFlight) { return this.inFlight; }
-    if (this.deps.nowMs() < this.backoffUntilMs) { return Promise.resolve(); }
-    if (!this.current.lastGood) {
-      this.setState({ ...this.current, loading: true });
+    const nowMs = this.deps.nowMs();
+    if (nowMs < this.backoffUntilMs) {
+      if (!force || this.manualBackoffBypassUsed) { return Promise.resolve(); }
+      this.manualBackoffBypassUsed = true;
+    } else {
+      this.manualBackoffBypassUsed = false;
     }
-    const startedAtMs = this.deps.nowMs();
+    this.setState({ ...this.current, loading: true });
+    const startedAtMs = nowMs;
     this.inFlight = this.provider.read(Math.floor(startedAtMs / 1000))
       .then((result) => {
         if (result.ok) {
           this.consecutiveRateLimits = 0;
           this.backoffUntilMs = 0;
+          this.manualBackoffBypassUsed = false;
           this.cache.save(result.quota);
-          this.setState({ enabled: true, loading: false, result, lastGood: result.quota });
+          this.setState({ enabled: true, loading: true, result, lastGood: result.quota });
           return;
         }
         if (result.kind === "rate-limited") {
@@ -65,6 +71,7 @@ export class SourceRuntime {
         } else {
           this.consecutiveRateLimits = 0;
           this.backoffUntilMs = 0;
+          this.manualBackoffBypassUsed = false;
         }
         const renderResult = this.current.lastGood
           ? { ok: true as const, quota: this.current.lastGood, diagnostic: result.error }
@@ -73,9 +80,12 @@ export class SourceRuntime {
               reason: result.kind === "missing" ? "missing" as const : "corrupt" as const,
               error: result.error,
             };
-        this.setState({ ...this.current, loading: false, result: renderResult });
+        this.setState({ ...this.current, loading: true, result: renderResult });
       })
-      .finally(() => { this.inFlight = null; });
+      .finally(() => {
+        this.inFlight = null;
+        this.setState({ ...this.current, loading: false });
+      });
     return this.inFlight;
   }
 

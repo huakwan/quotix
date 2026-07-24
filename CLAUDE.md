@@ -34,7 +34,8 @@ root and all quota data flows through a provider framework:
 
 The normal poll interval is two minutes for both providers. Each
 `SourceRuntime` keeps independent last-good quota and capped exponential 429
-backoff. Manual refresh does not bypass active backoff.
+backoff. Scheduled polls respect active backoff; manual refresh can make one
+immediate recovery attempt, while the in-flight guard still deduplicates requests.
 
 Never log or persist OAuth tokens, Keychain output, Codex credentials, or raw
 app-server payloads. Cache only normalized quota fields.

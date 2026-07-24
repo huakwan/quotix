@@ -35,6 +35,19 @@ test("runtime saves success and exposes it", async () => {
   assert.deepEqual(h.saved(), fresh);
 });
 
+test("runtime reports loading while refreshing cached quota", async () => {
+  let resolve;
+  const pending = new Promise((done) => { resolve = done; });
+  const h = harness([], quota);
+  h.provider.read = async () => pending;
+
+  const request = h.runtime.poll(true);
+  assert.equal(h.runtime.state().loading, true);
+  resolve({ ok: true, quota });
+  await request;
+  assert.equal(h.runtime.state().loading, false);
+});
+
 test("transient failure retains last-good data with diagnostic", async () => {
   const h = harness([{ ok: false, kind: "transient", error: "offline" }], quota);
   await h.runtime.poll();
@@ -47,19 +60,33 @@ test("missing provider without cache becomes unavailable", async () => {
   assert.deepEqual(h.runtime.state().result, { ok: false, reason: "missing", error: "not found" });
 });
 
-test("in-flight polls are deduplicated", async () => {
+test("in-flight polls are deduplicated even for manual refresh", async () => {
   let resolve;
   const pending = new Promise((done) => { resolve = done; });
   const h = harness([]);
   h.provider.read = async () => { h.provider.calls += 1; return pending; };
   const first = h.runtime.poll();
-  const second = h.runtime.poll();
+  const second = h.runtime.poll(true);
   assert.equal(h.provider.calls, 1);
   resolve({ ok: true, quota });
   await Promise.all([first, second]);
 });
 
-test("rate-limit backoff blocks force refresh and grows exponentially", async () => {
+test("rate-limit backoff blocks scheduled polls but manual refresh can recover", async () => {
+  const h = harness([
+    { ok: false, kind: "rate-limited", error: "429", retryAfterSeconds: 60 },
+    { ok: true, quota },
+  ]);
+  await h.runtime.poll();
+  h.setNow(30_000);
+  await h.runtime.poll();
+  assert.equal(h.provider.calls, 1);
+  await h.runtime.poll(true);
+  assert.equal(h.provider.calls, 2);
+  assert.deepEqual(h.runtime.state().lastGood, quota);
+});
+
+test("manual refresh bypasses an active backoff only once", async () => {
   const h = harness([
     { ok: false, kind: "rate-limited", error: "429", retryAfterSeconds: 60 },
     { ok: false, kind: "rate-limited", error: "429", retryAfterSeconds: 60 },
@@ -68,7 +95,20 @@ test("rate-limit backoff blocks force refresh and grows exponentially", async ()
   await h.runtime.poll();
   h.setNow(30_000);
   await h.runtime.poll(true);
-  assert.equal(h.provider.calls, 1);
+  await h.runtime.poll(true);
+  assert.equal(h.provider.calls, 2);
+  h.setNow(150_000);
+  await h.runtime.poll(true);
+  assert.equal(h.provider.calls, 3);
+});
+
+test("repeated scheduled rate limits still grow exponential backoff", async () => {
+  const h = harness([
+    { ok: false, kind: "rate-limited", error: "429", retryAfterSeconds: 60 },
+    { ok: false, kind: "rate-limited", error: "429", retryAfterSeconds: 60 },
+    { ok: true, quota },
+  ]);
+  await h.runtime.poll();
   h.setNow(60_000);
   await h.runtime.poll();
   assert.equal(h.provider.calls, 2);

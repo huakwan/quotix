@@ -110,8 +110,8 @@ async function updateTray(provider: ProviderId, snapshot: QuotaSnapshot): Promis
   }
 }
 
-function poll(force = false): void {
-  void coordinator?.pollEnabled(force);
+function poll(force = false): Promise<void> {
+  return coordinator?.pollEnabled(force) ?? Promise.resolve();
 }
 
 function persistPreferences(): void {
@@ -146,9 +146,10 @@ function showAbout(): void {
 }
 
 function registerIpc(): void {
-  ipcMain.on("quota:refresh", () => {
-    poll(true);
+  ipcMain.handle("quota:refresh", async () => {
+    const refresh = poll(true);
     checkForUpdates(true);
+    await refresh;
   });
   ipcMain.on("quota:quit", () => app.quit());
   ipcMain.on("about:open", (event) => {

@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   canActivateUpdateAction,
+  isQuotaRefreshInProgress,
   quotaRowsForProvider,
   sectionsForPayload,
   showMenuBarSetting,
@@ -48,6 +49,18 @@ test("menu-bar setting is visible only for both", () => {
   assert.equal(showMenuBarSetting(payload("both").preferences), true);
   assert.equal(showMenuBarSetting(payload("claude").preferences), false);
   assert.equal(showMenuBarSetting(payload("codex").preferences), false);
+});
+
+test("refresh progress follows only enabled source sections", () => {
+  const both = payload("both");
+  both.snapshot.codex.loading = true;
+  assert.equal(isQuotaRefreshInProgress(both), true);
+
+  const claudeOnly = payload("claude");
+  claudeOnly.snapshot.codex.loading = true;
+  assert.equal(isQuotaRefreshInProgress(claudeOnly), false);
+  claudeOnly.snapshot.claude.loading = true;
+  assert.equal(isQuotaRefreshInProgress(claudeOnly), true);
 });
 
 test("quota rows keep both Claude windows but filter missing Codex windows", () => {

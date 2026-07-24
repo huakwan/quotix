@@ -22,7 +22,7 @@ test("manual quota refresh also checks for app updates", () => {
 
   assert.match(
     main,
-    /ipcMain\.on\("quota:refresh", \(\) => \{\s*poll\(true\);\s*checkForUpdates\(true\);\s*\}\)/,
+    /ipcMain\.handle\("quota:refresh", async \(\) => \{\s*const refresh = poll\(true\);\s*checkForUpdates\(true\);\s*await refresh;\s*\}\)/,
   );
 });
 

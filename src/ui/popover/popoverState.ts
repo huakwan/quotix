@@ -54,6 +54,10 @@ export function showMenuBarSetting(preferences: Preferences): boolean {
   return preferences.source === "both";
 }
 
+export function isQuotaRefreshInProgress(payload: PopoverPayload): boolean {
+  return sectionsForPayload(payload).some((section) => section.state.loading);
+}
+
 export type UpdateAction = "download" | "cancel" | "install" | "reveal" | "retry";
 
 export interface UpdatePresentation {
