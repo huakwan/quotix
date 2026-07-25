@@ -14,7 +14,7 @@ a popover with Claude, Codex, or both.
   currently reported by Codex
 - Popover source setting: `Claude`, `Codex`, or `Both`
 - Independent menu-bar source setting while `Both` is selected
-- Shared two-minute poll cadence with independent in-flight and rate-limit state
+- Shared five-minute poll cadence with independent in-flight and rate-limit state
 - Separate last-good caches so one provider's failure never hides the other
 - Live reset countdown or wall-clock reset time
 - Pace line marker on each bar, showing how much of the window has elapsed so

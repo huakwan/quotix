@@ -32,7 +32,7 @@ root and all quota data flows through a provider framework:
 6. `src/preferences.ts` — validated JSON settings under Electron user data.
 7. `src/ui/` — pure tray/popover selectors plus Electron/DOM renderers.
 
-The normal poll interval is two minutes for both providers. Each
+The normal poll interval is five minutes for both providers. Each
 `SourceRuntime` keeps independent last-good quota and capped exponential 429
 backoff. Scheduled polls respect active backoff; manual refresh can make one
 immediate recovery attempt, while the in-flight guard still deduplicates requests.

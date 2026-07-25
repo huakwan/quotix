@@ -7,6 +7,16 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
+test("main process polls quotas every five minutes", () => {
+  const main = readFileSync(join(root, "src", "main.ts"), "utf8");
+
+  assert.match(main, /const REFRESH_INTERVAL_SECONDS = 5 \* 60;/);
+  assert.match(
+    main,
+    /setInterval\(\(\) => poll\(\), REFRESH_INTERVAL_SECONDS \* 1000\)/,
+  );
+});
+
 test("main process checks for updates every three hours", () => {
   const main = readFileSync(join(root, "src", "main.ts"), "utf8");
 

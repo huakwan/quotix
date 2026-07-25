@@ -55,7 +55,7 @@ import { stageUpdate } from "./update/stager";
 import updatePublicKey from "./update/key/quotix-update-public.pem";
 import { createAboutWindow } from "./ui/about/aboutWindow";
 
-const REFRESH_INTERVAL_SECONDS = 2 * 60;
+const REFRESH_INTERVAL_SECONDS = 5 * 60;
 const UPDATE_CHECK_INTERVAL_MS = 3 * 60 * 60 * 1000;
 const UPDATE_STARTUP_DELAY_MS = 30 * 1000;
 
