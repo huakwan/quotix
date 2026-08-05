@@ -56,8 +56,18 @@ import updatePublicKey from "./update/key/quotix-update-public.pem";
 import { createAboutWindow } from "./ui/about/aboutWindow";
 
 const REFRESH_INTERVAL_SECONDS = 5 * 60;
+// Spread scheduled polls so we do not land on the same instant as the Claude Code
+// CLI, which shares the usage endpoint's small request budget.
+const REFRESH_JITTER_MS = 60 * 1000;
 const UPDATE_CHECK_INTERVAL_MS = 3 * 60 * 60 * 1000;
 const UPDATE_STARTUP_DELAY_MS = 30 * 1000;
+
+// A stray second copy — typically a staged update bundle launched by hand — polls
+// the same quota endpoints on its own schedule. That doubles the request rate
+// against a very small budget and is enough to keep the account rate limited
+// indefinitely, so only one Quotix may run.
+const hasInstanceLock = app.requestSingleInstanceLock();
+if (!hasInstanceLock) { app.quit(); }
 
 let tray: Tray | undefined;
 let popover: BrowserWindow | undefined;
@@ -114,8 +124,15 @@ async function updateTray(provider: ProviderId, snapshot: QuotaSnapshot): Promis
   }
 }
 
-function poll(force = false): Promise<void> {
-  return coordinator?.pollEnabled(force) ?? Promise.resolve();
+function poll(): Promise<void> {
+  return coordinator?.pollEnabled() ?? Promise.resolve();
+}
+
+// Self-rescheduling instead of setInterval so each tick gets its own jitter.
+function scheduleNextPoll(): void {
+  if (disposed) { return; }
+  const delay = REFRESH_INTERVAL_SECONDS * 1000 + Math.random() * REFRESH_JITTER_MS;
+  pollTimer = setTimeout(() => { void poll().finally(scheduleNextPoll); }, delay);
 }
 
 function persistPreferences(): void {
@@ -151,7 +168,7 @@ function showAbout(): void {
 
 function registerIpc(): void {
   ipcMain.handle("quota:refresh", async () => {
-    const refresh = poll(true);
+    const refresh = poll();
     checkForUpdates(true);
     await refresh;
   });
@@ -211,7 +228,7 @@ function registerIpc(): void {
 function dispose(): void {
   if (disposed) { return; }
   disposed = true;
-  if (pollTimer) { clearInterval(pollTimer); pollTimer = undefined; }
+  if (pollTimer) { clearTimeout(pollTimer); pollTimer = undefined; }
   unsubscribeCoordinator?.();
   unsubscribeCoordinator = undefined;
   coordinator?.dispose();
@@ -225,6 +242,7 @@ function dispose(): void {
 }
 
 app.whenReady().then(async () => {
+  if (!hasInstanceLock) { return; }
   app.dock?.hide();
   const userDataDir = app.getPath("userData");
   preferences = loadPreferences(userDataDir);
@@ -250,10 +268,14 @@ app.whenReady().then(async () => {
   popover = createPopover();
   tray = new Tray(nativeImage.createEmpty());
   tray.on("click", () => {
-    if (popover && tray && togglePopover(popover, tray.getBounds())) { render(); }
+    if (!popover || !tray || !togglePopover(popover, tray.getBounds())) { return; }
+    render();
+    // Opening the popover is the moment the numbers are actually read, so spend a
+    // request here. The runtime's spacing and backoff guards decide if it goes out.
+    void poll();
   });
   tray.on("right-click", () => tray?.popUpContextMenu(Menu.buildFromTemplate([
-    { label: "Refresh now", click: () => poll(true) },
+    { label: "Refresh now", click: () => poll() },
     { label: "Check for Updates…", click: () => checkForUpdates(true) },
     { type: "separator" },
     { label: "Quit", role: "quit" },
@@ -321,8 +343,8 @@ app.whenReady().then(async () => {
 
   registerIpc();
   render();
-  poll();
-  pollTimer = setInterval(() => poll(), REFRESH_INTERVAL_SECONDS * 1000);
+  void poll();
+  scheduleNextPoll();
   updateStartupTimer = setTimeout(() => checkForUpdates(false), UPDATE_STARTUP_DELAY_MS);
   updateCheckTimer = setInterval(() => checkForUpdates(false), UPDATE_CHECK_INTERVAL_MS);
   nativeTheme.on("updated", render);
@@ -371,5 +393,12 @@ app.whenReady().then(async () => {
   }
 });
 
+// A second launch surfaces the running instance instead of starting a new poller.
+app.on("second-instance", () => {
+  if (popover && tray && !popover.isVisible()) {
+    togglePopover(popover, tray.getBounds());
+    render();
+  }
+});
 app.on("before-quit", dispose);
 app.on("window-all-closed", () => { /* menu bar app intentionally stays alive */ });

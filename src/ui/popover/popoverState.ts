@@ -39,6 +39,17 @@ export function quotaRowsForProvider(provider: ProviderId, quota: Quota): QuotaR
   return rows;
 }
 
+// The tooltip is absolutely positioned, so it cannot push the popover taller —
+// anything past three rendered lines would be clipped by the window edge instead.
+// Capping the text here keeps what survives the clamp a whole message.
+const DIAGNOSTIC_MAX_CHARS = 120;
+
+export function diagnosticText(error: string): string {
+  const text = error.replace(/\s+/g, " ").trim();
+  if (text.length <= DIAGNOSTIC_MAX_CHARS) { return text; }
+  return `${text.slice(0, DIAGNOSTIC_MAX_CHARS - 1).trimEnd()}…`;
+}
+
 export function sectionsForPayload(payload: PopoverPayload): PopoverSection[] {
   const ids: ProviderId[] = payload.preferences.source === "both"
     ? ["claude", "codex"]

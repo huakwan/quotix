@@ -39,8 +39,8 @@ export class QuotaCoordinator {
     this.notify();
   }
 
-  async pollEnabled(force = false): Promise<void> {
-    await Promise.all([...this.runtimes.values()].map((runtime) => runtime.poll(force)));
+  async pollEnabled(): Promise<void> {
+    await Promise.all([...this.runtimes.values()].map((runtime) => runtime.poll()));
   }
 
   snapshot(): QuotaSnapshot {

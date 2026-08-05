@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   canActivateUpdateAction,
+  diagnosticText,
   isQuotaRefreshInProgress,
   quotaRowsForProvider,
   sectionsForPayload,
@@ -128,4 +129,28 @@ test("update presentation maps state to fixed safe actions", () => {
   assert.equal(updatePresentation({ status: "ready", version: "1.0.7" }).action, "install");
   assert.equal(updatePresentation({ status: "fallback", version: "1.0.7" }).action, "reveal");
   assert.equal(updatePresentation({ status: "error", error: "Unable to update." }).action, "retry");
+});
+
+test("diagnostic text collapses whitespace and passes short messages through", () => {
+  assert.equal(diagnosticText("HTTP 429"), "HTTP 429");
+  assert.equal(diagnosticText("  Network   error\n(TypeError) "), "Network error (TypeError)");
+});
+
+test("diagnostic text is capped so the tooltip cannot outgrow the popover", () => {
+  const long = diagnosticText("x".repeat(400));
+  assert.equal(long.length, 120);
+  assert.ok(long.endsWith("…"));
+});
+
+test("diagnostic text does not truncate the credential messages the provider sends", () => {
+  const messages = [
+    "No Claude Code credentials in the Keychain. Sign in with the Claude Code CLI",
+    "The Claude Code credential could not be parsed. Sign in with the Claude Code CLI",
+    "Could not read the Claude Code credential from the Keychain",
+    "The Claude Code access token expired. Run Claude Code to renew it",
+    "Claude Code credentials are only readable on macOS",
+  ];
+  for (const message of messages) {
+    assert.equal(diagnosticText(message), message);
+  }
 });

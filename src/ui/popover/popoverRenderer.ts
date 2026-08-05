@@ -1,5 +1,6 @@
 import {
   canActivateUpdateAction,
+  diagnosticText,
   isQuotaRefreshInProgress,
   quotaRowsForProvider,
   sectionsForPayload,
@@ -96,7 +97,7 @@ function updatedLine(quota: { updatedAt: number }, state: SourceState, nowSec: n
   const error = state.result.ok ? state.result.diagnostic : undefined;
   if (!stale || !error) { return `<div class="updated">${text}</div>`; }
   return `<div class="updated"><span class="info" tabindex="-1">${INFO_ICON}`
-    + `<span class="tooltip">${escapeHtml(error)}</span></span>${text}</div>`;
+    + `<span class="tooltip">${escapeHtml(diagnosticText(error))}</span></span>${text}</div>`;
 }
 
 function updatedAgo(updatedAt: number, nowSec: number): string {
@@ -112,6 +113,9 @@ function updatedAgo(updatedAt: number, nowSec: number): string {
 
 function unavailableMessage(provider: ProviderId, state: SourceState): string {
   if (state.loading) { return "Loading…"; }
+  // The provider knows which of several causes it hit; prefer its wording over a
+  // guess made from the coarse reason alone.
+  if (!state.result.ok && state.result.error) { return diagnosticText(state.result.error); }
   if (provider === "claude" && !state.result.ok && state.result.reason === "missing") {
     return "No Claude Code credentials found. Sign in with the Claude Code CLI.";
   }

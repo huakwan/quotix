@@ -24,9 +24,14 @@ root and all quota data flows through a provider framework:
 2. `src/quota/sourceRuntime.ts` — per-source cache, loading, in-flight,
    consecutive rate-limit, and backoff state.
 3. `src/quota/coordinator.ts` — source lifecycle and concurrent polling.
-4. `src/quota/claude/` — Keychain credential provider and Anthropic OAuth usage
-   adapter. Preserve sync startup seed, async credential refresh, 401
-   invalidation, and safe diagnostics.
+4. `src/quota/claude/` — Keychain credential reader and Anthropic OAuth usage
+   adapter. Preserve sync startup seed, async re-read, 401 invalidation, and safe
+   diagnostics. Quotix only observes the credential the Claude Code CLI owns: it
+   never refreshes the OAuth token and never writes the Keychain item. Refreshing
+   rotates a refresh token shared with the CLI, and a rotation that loses the race
+   has no local recovery. An expired token is reported as expired; the next read
+   picks up whatever the CLI wrote. Each failure reason gets its own message —
+   never collapse them into one.
 5. `src/quota/codex/` — executable discovery, newline-delimited JSON-RPC
    app-server client, and rate-limit mapping. Always dispose the child process.
 6. `src/preferences.ts` — validated JSON settings under Electron user data.

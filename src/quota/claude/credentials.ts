@@ -1,42 +1,47 @@
 import { execFile, execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import * as os from "node:os";
+import * as path from "node:path";
 import { promisify } from "node:util";
+
+/**
+ * Why no usable access token could be produced. Carries no token material, so it
+ * is safe to render and to hand to the provider as a diagnostic.
+ */
+export type CredentialFailure =
+  | "unsupported-platform"
+  | "not-found"
+  | "keychain-unavailable"
+  | "corrupt"
+  | "expired";
 
 export type TokenResult =
   | { ok: true; token: string }
-  | { ok: false; reason: string };
+  | { ok: false; reason: CredentialFailure };
 
 export interface OAuthCredentials {
   accessToken: string;
-  refreshToken: string;
   expiresAt: number;
-  refreshTokenExpiresAt: number | null;
 }
 
 export type CredentialsResult =
-  | { ok: true; creds: OAuthCredentials; raw: string }
-  | { ok: false; reason: string };
-
-export type RefreshResult =
   | { ok: true; creds: OAuthCredentials }
-  | { ok: false; reason: string };
+  | { ok: false; reason: CredentialFailure };
 
-const KEYCHAIN_SERVICE = "Claude Code-credentials";
-const OAUTH_TOKEN_URL = "https://console.anthropic.com/v1/oauth/token";
-const OAUTH_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
-const DEFAULT_TOKEN_REFRESH_MS = 30_000;
+const KEYCHAIN_SERVICE_BASE = "Claude Code";
+const KEYCHAIN_SERVICE_KIND = "-credentials";
+const CREDENTIALS_FILE = ".credentials.json";
+const DEFAULT_REREAD_MS = 30_000;
+// Treat a token as spent a minute early: a request carrying a token that lapses
+// mid-flight comes back 401, which costs a request against a very small budget.
 const EXPIRY_SKEW_MS = 60_000;
-const REFRESH_TIMEOUT_MS = 20_000;
+// security(1) exits 44 (errSecItemNotFound) when the item simply is not there.
+// Every other non-zero exit means the read failed — locked keychain, denied ACL,
+// missing binary — which is a different problem with a different remedy.
+const ITEM_NOT_FOUND_EXIT = 44;
 const execFileAsync = promisify(execFile);
-
-type FetchImpl = (url: string, init?: RequestInit) => Promise<Response>;
-
-function safeFetchError(error: unknown): string {
-  const name = error instanceof Error ? error.name : undefined;
-  if (name === "AbortError" || name === "TimeoutError") { return "Request timed out"; }
-  if (name === "Error" || name === "TypeError") { return `Network error (${name})`; }
-  return "Network error";
-}
 
 export function parseOAuthCredentials(blob: string): CredentialsResult {
   try {
@@ -48,13 +53,9 @@ export function parseOAuthCredentials(blob: string): CredentialsResult {
     }
     return {
       ok: true,
-      raw: blob,
       creds: {
         accessToken,
-        refreshToken: typeof oauth?.refreshToken === "string" ? oauth.refreshToken : "",
         expiresAt: typeof oauth?.expiresAt === "number" ? oauth.expiresAt : 0,
-        refreshTokenExpiresAt:
-          typeof oauth?.refreshTokenExpiresAt === "number" ? oauth.refreshTokenExpiresAt : null,
       },
     };
   } catch {
@@ -62,187 +63,173 @@ export function parseOAuthCredentials(blob: string): CredentialsResult {
   }
 }
 
-interface RefreshDeps {
-  fetchImpl: FetchImpl;
-  now: () => number;
+type Env = Record<string, string | undefined>;
+
+// A value the CLI would read as off, so a disabled flag does not send us looking
+// for a Keychain item that was never written.
+function enabled(value: string | undefined): boolean {
+  return value !== undefined && value !== "" && value !== "0" && value !== "false";
 }
 
-export async function refreshAccessToken(
-  refreshToken: string,
-  deps: RefreshDeps,
-): Promise<RefreshResult> {
-  try {
-    const response = await deps.fetchImpl(OAUTH_TOKEN_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        grant_type: "refresh_token",
-        refresh_token: refreshToken,
-        client_id: OAUTH_CLIENT_ID,
-      }),
-      signal: AbortSignal.timeout(REFRESH_TIMEOUT_MS),
-    });
-    if (!response.ok) { return { ok: false, reason: `HTTP ${response.status}` }; }
-    const data = (await response.json()) as Record<string, unknown>;
-    const accessToken = data.access_token;
-    if (typeof accessToken !== "string" || accessToken.length === 0) {
-      return { ok: false, reason: "corrupt" };
-    }
-    const expiresIn = typeof data.expires_in === "number" ? data.expires_in : 0;
-    return {
-      ok: true,
-      creds: {
-        accessToken,
-        refreshToken:
-          typeof data.refresh_token === "string" && data.refresh_token.length > 0
-            ? data.refresh_token
-            : refreshToken,
-        expiresAt: deps.now() + expiresIn * 1000,
-        refreshTokenExpiresAt:
-          typeof data.refresh_token_expires_at === "number" ? data.refresh_token_expires_at : null,
-      },
-    };
-  } catch (error) {
-    return { ok: false, reason: safeFetchError(error) };
-  }
+// The env override is used verbatim, only NFC-normalized, so a decomposed path
+// hashes to the same scope the CLI derived from it.
+function configDir(env: Env): string {
+  return (env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), ".claude")).normalize("NFC");
 }
 
-export function applyRefreshedTokens(originalBlob: string, refreshed: OAuthCredentials): string {
-  const value = JSON.parse(originalBlob) as Record<string, unknown>;
-  const oauth = { ...((value.claudeAiOauth as Record<string, unknown> | undefined) ?? {}) };
-  oauth.accessToken = refreshed.accessToken;
-  oauth.refreshToken = refreshed.refreshToken;
-  oauth.expiresAt = refreshed.expiresAt;
-  if (refreshed.refreshTokenExpiresAt !== null) {
-    oauth.refreshTokenExpiresAt = refreshed.refreshTokenExpiresAt;
-  }
-  return JSON.stringify({ ...value, claudeAiOauth: oauth });
+// Non-production sign-ins live under their own item; matching the suffix keeps a
+// developer's local or custom-endpoint session readable.
+function oauthSuffix(env: Env): string {
+  if (enabled(env.CLAUDE_CODE_CUSTOM_OAUTH_URL)) { return "-custom-oauth"; }
+  if (enabled(env.USE_LOCAL_OAUTH)) { return "-local-oauth"; }
+  return "";
+}
+
+/**
+ * The CLI scopes its Keychain item per config directory, so the service name is
+ * only "Claude Code-credentials" for a default install. Hardcoding that name
+ * reported "no credentials" to every user who sets CLAUDE_CONFIG_DIR — a signed-in
+ * user told to sign in.
+ */
+export function keychainService(env: Env = process.env): string {
+  const secureDir = env.CLAUDE_SECURESTORAGE_CONFIG_DIR;
+  // An explicitly empty override means the default dir, which carries no scope.
+  const unscoped = secureDir !== undefined ? secureDir === "" : !enabled(env.CLAUDE_CONFIG_DIR);
+  const dir = secureDir !== undefined ? secureDir.normalize("NFC") : configDir(env);
+  const scope = unscoped ? "" : `-${createHash("sha256").update(dir).digest("hex").slice(0, 8)}`;
+  return `${KEYCHAIN_SERVICE_BASE}${oauthSuffix(env)}${KEYCHAIN_SERVICE_KIND}${scope}`;
+}
+
+/** Where the CLI keeps the same blob when it cannot use the Keychain. */
+export function credentialsFilePath(env: Env = process.env): string {
+  const secureDir = env.CLAUDE_SECURESTORAGE_CONFIG_DIR;
+  const dir = secureDir !== undefined
+    ? (secureDir || path.join(os.homedir(), ".claude")).normalize("NFC")
+    : configDir(env);
+  return path.join(dir, CREDENTIALS_FILE);
+}
+
+// A blob that came back but would not parse is the item the CLI owns; reporting it
+// as corrupt is the truth. Only a Keychain with nothing to say defers to the file.
+const FILE_FALLBACK_REASONS: ReadonlySet<CredentialFailure> = new Set<CredentialFailure>([
+  "not-found",
+  "keychain-unavailable",
+]);
+
+/**
+ * The CLI falls back to a plaintext file when the Keychain is unusable, so a
+ * Keychain miss is not proof that no credential exists.
+ */
+export function withFileFallback(
+  keychain: CredentialsResult,
+  readFileCreds: () => CredentialsResult | null,
+): CredentialsResult {
+  if (keychain.ok || !FILE_FALLBACK_REASONS.has(keychain.reason)) { return keychain; }
+  const file = readFileCreds();
+  return file?.ok ? file : keychain;
 }
 
 function keychainArgs(): string[] {
-  return ["find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", os.userInfo().username, "-w"];
+  return ["find-generic-password", "-s", keychainService(), "-a", os.userInfo().username, "-w"];
+}
+
+// execFileSync reports the exit status as `status`; promisified execFile puts it in
+// `code`, which is a string ("ENOENT") when the binary itself could not be run.
+export function failureFromExec(error: unknown): CredentialFailure {
+  const value = error as { status?: unknown; code?: unknown } | null;
+  const exit = typeof value?.status === "number" ? value.status : value?.code;
+  return exit === ITEM_NOT_FOUND_EXIT ? "not-found" : "keychain-unavailable";
 }
 
 export function readOAuthCredentials(): CredentialsResult {
   if (process.platform !== "darwin") { return { ok: false, reason: "unsupported-platform" }; }
-  try { return parseOAuthCredentials(execFileSync("security", keychainArgs(), { encoding: "utf8" })); }
-  catch { return { ok: false, reason: "keychain-unavailable" }; }
+  let keychain: CredentialsResult;
+  try { keychain = parseOAuthCredentials(execFileSync("security", keychainArgs(), { encoding: "utf8" })); }
+  catch (error) { keychain = { ok: false, reason: failureFromExec(error) }; }
+  return withFileFallback(keychain, () => {
+    try { return parseOAuthCredentials(readFileSync(credentialsFilePath(), "utf8")); }
+    catch { return null; }
+  });
 }
 
 export async function readOAuthCredentialsAsync(): Promise<CredentialsResult> {
   if (process.platform !== "darwin") { return { ok: false, reason: "unsupported-platform" }; }
+  let keychain: CredentialsResult;
   try {
     const { stdout } = await execFileAsync("security", keychainArgs(), { encoding: "utf8" });
-    return parseOAuthCredentials(stdout);
-  } catch {
-    return { ok: false, reason: "keychain-unavailable" };
+    keychain = parseOAuthCredentials(stdout);
+  } catch (error) {
+    keychain = { ok: false, reason: failureFromExec(error) };
   }
+  if (keychain.ok || !FILE_FALLBACK_REASONS.has(keychain.reason)) { return keychain; }
+  const file = await readFile(credentialsFilePath(), "utf8").then(parseOAuthCredentials, () => null);
+  return file?.ok ? file : keychain;
 }
 
-// Persists refreshed tokens back to the Keychain item Claude Code shares. The blob
-// is passed as an argv entry to `security`; this is briefly visible to same-user
-// processes, matching how Claude Code itself manages the credential.
-export function writeOAuthCredentialsBlob(blob: string): void {
-  if (process.platform !== "darwin") { return; }
-  try {
-    execFileSync(
-      "security",
-      ["add-generic-password", "-U", "-s", KEYCHAIN_SERVICE, "-a", os.userInfo().username, "-w", blob],
-      { stdio: "ignore" },
-    );
-  } catch { /* best effort; the CLI can re-establish credentials if this fails */ }
+function toToken(result: CredentialsResult, nowMs: number): TokenResult {
+  if (!result.ok) { return { ok: false, reason: result.reason }; }
+  // expiresAt 0 means the blob never carried one; let the endpoint be the judge.
+  if (result.creds.expiresAt > 0 && nowMs >= result.creds.expiresAt - EXPIRY_SKEW_MS) {
+    return { ok: false, reason: "expired" };
+  }
+  return { ok: true, token: result.creds.accessToken };
 }
 
 export interface CachedTokenProvider {
-  get(): TokenResult;
+  get(): Promise<TokenResult>;
   invalidate(): void;
 }
 
 interface CachedTokenProviderDeps {
   readSync: () => CredentialsResult;
   readAsync: () => Promise<CredentialsResult>;
-  refresh: (refreshToken: string) => Promise<RefreshResult>;
-  writeBlob: (blob: string) => void;
   now: () => number;
-  refreshMs: number;
+  rereadMs: number;
 }
 
+/**
+ * Observes the credential Claude Code owns: reads the Keychain, never refreshes
+ * and never writes it.
+ *
+ * Refreshing rotates the refresh token inside an item shared with the CLI, so the
+ * two race for it, and a rotation that loses has no local recovery — every later
+ * refresh is rejected and the app reports a credential error until something else
+ * repairs the item. Renewal belongs to the CLI; an expired token is reported as
+ * expired, and the next read picks up whatever the CLI wrote.
+ */
 export function createCachedTokenProvider(
   deps: Partial<CachedTokenProviderDeps> = {},
 ): CachedTokenProvider {
   const readSync = deps.readSync ?? readOAuthCredentials;
   const readAsync = deps.readAsync ?? readOAuthCredentialsAsync;
-  const refresh =
-    deps.refresh ?? ((refreshToken: string) => refreshAccessToken(refreshToken, { fetchImpl: fetch, now: Date.now }));
-  const writeBlob = deps.writeBlob ?? writeOAuthCredentialsBlob;
   const now = deps.now ?? Date.now;
-  const refreshMs = deps.refreshMs ?? DEFAULT_TOKEN_REFRESH_MS;
+  const rereadMs = deps.rereadMs ?? DEFAULT_REREAD_MS;
 
-  let current: TokenResult;
-  let expiresAt = 0;
-  let lastReadAt = now();
-  let inFlight = false;
+  // Synchronous seed so the first poll of a launch has a token without waiting.
+  let current: TokenResult = toToken(readSync(), now());
+  let readAtMs = now();
+  let inFlight: Promise<void> | null = null;
 
-  const applyCreds = (result: CredentialsResult): void => {
-    if (result.ok) {
-      current = { ok: true, token: result.creds.accessToken };
-      expiresAt = result.creds.expiresAt;
-    } else {
-      current = { ok: false, reason: result.reason };
-      expiresAt = 0;
-    }
-  };
-
-  applyCreds(readSync());
-
-  const isExpired = (nowMs: number, at: number): boolean => at > 0 && nowMs >= at - EXPIRY_SKEW_MS;
-
-  const doRefresh = (): void => {
-    if (inFlight) { return; }
-    inFlight = true;
-    void (async () => {
-      try {
-        const result = await readAsync();
-        if (!result.ok) { applyCreds(result); return; }
-        const nowMs = now();
-        if (!isExpired(nowMs, result.creds.expiresAt)) {
-          // Keychain holds a still-valid token (e.g. the CLI refreshed it).
-          applyCreds(result);
-          return;
-        }
-        const rtExpiry = result.creds.refreshTokenExpiresAt;
-        if (result.creds.refreshToken.length === 0 || (rtExpiry !== null && nowMs >= rtExpiry)) {
-          // Refresh token itself is gone/expired — headless refresh cannot recover.
-          current = { ok: false, reason: "refresh-token-expired" };
-          expiresAt = 0;
-          return;
-        }
-        const refreshed = await refresh(result.creds.refreshToken);
-        if (!refreshed.ok) {
-          current = { ok: false, reason: refreshed.reason };
-          expiresAt = 0;
-          return;
-        }
-        writeBlob(applyRefreshedTokens(result.raw, refreshed.creds));
-        current = { ok: true, token: refreshed.creds.accessToken };
-        expiresAt = refreshed.creds.expiresAt;
-      } catch {
-        /* retain last-known token */
-      } finally {
-        lastReadAt = now();
-        inFlight = false;
-      }
-    })();
+  const reread = (): Promise<void> => {
+    if (inFlight) { return inFlight; }
+    inFlight = readAsync()
+      .then(
+        (result) => { current = toToken(result, now()); },
+        () => { /* retain the last known token */ },
+      )
+      .finally(() => { readAtMs = now(); inFlight = null; });
+    return inFlight;
   };
 
   return {
-    get: () => {
-      const nowMs = now();
-      if (nowMs - lastReadAt >= refreshMs || isExpired(nowMs, expiresAt) || !current.ok) {
-        doRefresh();
-      }
+    // Awaited rather than fire-and-forget: the read is local and cheap, and a
+    // stale in-memory failure must not outlive the Keychain item that fixed it.
+    async get(): Promise<TokenResult> {
+      if (now() - readAtMs >= rereadMs || !current.ok) { await reread(); }
       return current;
     },
-    invalidate: doRefresh,
+    // Cheap: marks the cache stale so the next get() re-reads, rather than
+    // spending a read the caller may not need.
+    invalidate(): void { readAtMs = Number.NEGATIVE_INFINITY; },
   };
 }

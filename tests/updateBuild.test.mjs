@@ -7,13 +7,34 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-test("main process polls quotas every five minutes", () => {
+test("main process polls quotas every five minutes with jitter", () => {
   const main = readFileSync(join(root, "src", "main.ts"), "utf8");
 
   assert.match(main, /const REFRESH_INTERVAL_SECONDS = 5 \* 60;/);
+  assert.match(main, /const REFRESH_JITTER_MS = 60 \* 1000;/);
   assert.match(
     main,
-    /setInterval\(\(\) => poll\(\), REFRESH_INTERVAL_SECONDS \* 1000\)/,
+    /REFRESH_INTERVAL_SECONDS \* 1000 \+ Math\.random\(\) \* REFRESH_JITTER_MS/,
+  );
+  assert.match(main, /scheduleNextPoll\(\);/);
+  assert.doesNotMatch(main, /setInterval\(\(\) => poll\(/);
+});
+
+test("only one instance may poll the quota endpoints", () => {
+  const main = readFileSync(join(root, "src", "main.ts"), "utf8");
+
+  assert.match(main, /const hasInstanceLock = app\.requestSingleInstanceLock\(\);/);
+  assert.match(main, /if \(!hasInstanceLock\) \{ app\.quit\(\); \}/);
+  assert.match(main, /whenReady\(\)\.then\(async \(\) => \{\s*if \(!hasInstanceLock\) \{ return; \}/);
+  assert.match(main, /app\.on\("second-instance"/);
+});
+
+test("opening the popover refreshes quota", () => {
+  const main = readFileSync(join(root, "src", "main.ts"), "utf8");
+
+  assert.match(
+    main,
+    /togglePopover\(popover, tray\.getBounds\(\)\)\) \{ return; \}\s*render\(\);[\s\S]{0,200}?void poll\(\);/,
   );
 });
 
@@ -32,7 +53,7 @@ test("manual quota refresh also checks for app updates", () => {
 
   assert.match(
     main,
-    /ipcMain\.handle\("quota:refresh", async \(\) => \{\s*const refresh = poll\(true\);\s*checkForUpdates\(true\);\s*await refresh;\s*\}\)/,
+    /ipcMain\.handle\("quota:refresh", async \(\) => \{\s*const refresh = poll\(\);\s*checkForUpdates\(true\);\s*await refresh;\s*\}\)/,
   );
 });
 

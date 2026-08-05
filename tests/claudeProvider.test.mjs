@@ -6,17 +6,34 @@ import { ClaudeQuotaProvider } from "../out/src/quota/claude/provider.js";
 function harness(token, fetchImpl) {
   let invalidations = 0;
   const provider = new ClaudeQuotaProvider({
-    tokenProvider: { get: () => token, invalidate: () => { invalidations += 1; } },
+    tokenProvider: { get: async () => token, invalidate: () => { invalidations += 1; } },
     fetchImpl,
   });
   return { provider, invalidations: () => invalidations };
 }
 
-test("missing token maps to missing provider", async () => {
-  const h = harness({ ok: false, reason: "keychain-unavailable" }, async () => { throw new Error("unused"); });
-  assert.deepEqual(await h.provider.read(100), {
-    ok: false, kind: "missing", error: "Claude Code credentials were not found",
-  });
+const unused = async () => { throw new Error("unused"); };
+
+test("each credential failure reports its own cause", async () => {
+  const cases = [
+    ["not-found", "missing", "No Claude Code credentials in the Keychain. Sign in with the Claude Code CLI"],
+    ["corrupt", "missing", "The Claude Code credential could not be parsed. Sign in with the Claude Code CLI"],
+    ["unsupported-platform", "missing", "Claude Code credentials are only readable on macOS"],
+    ["keychain-unavailable", "transient", "Could not read the Claude Code credential from the Keychain"],
+    ["expired", "transient", "The Claude Code access token expired. Run Claude Code to renew it"],
+  ];
+  for (const [reason, kind, error] of cases) {
+    const h = harness({ ok: false, reason }, unused);
+    assert.deepEqual(await h.provider.read(100), { ok: false, kind, error }, reason);
+  }
+});
+
+test("no credential failure claims the token was simply not found", async () => {
+  for (const reason of ["keychain-unavailable", "corrupt", "expired", "unsupported-platform"]) {
+    const h = harness({ ok: false, reason }, unused);
+    const result = await h.provider.read(100);
+    assert.notEqual(result.error, "Claude Code credentials were not found", reason);
+  }
 });
 
 test("successful OAuth usage maps to shared quota", async () => {
@@ -67,6 +84,17 @@ test("429 exposes retry-after seconds", async () => {
   assert.deepEqual(await h.provider.read(100), {
     ok: false, kind: "rate-limited", error: "HTTP 429", retryAfterSeconds: 90,
   });
+});
+
+test("429 omits retry-after when the header is absent or non-positive", async () => {
+  for (const headers of [{}, { "retry-after": "0" }, { "retry-after": "later" }]) {
+    const h = harness({ ok: true, token: "secret" }, async () => new Response("", {
+      status: 429, headers,
+    }));
+    assert.deepEqual(await h.provider.read(100), {
+      ok: false, kind: "rate-limited", error: "HTTP 429", retryAfterSeconds: undefined,
+    });
+  }
 });
 
 test("network failures become safe transient diagnostics", async () => {

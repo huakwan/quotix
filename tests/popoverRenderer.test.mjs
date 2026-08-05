@@ -149,3 +149,32 @@ test("about donation card keeps the QR anonymous on screen and transparent", () 
   assert.match(renderer, /dark: "#ffffff"/);
   assert.match(renderer, /light: "#00000000"/);
 });
+
+function tooltipRule() {
+  const html = readFileSync(join(root, "src/ui/popover/popover.html"), "utf8");
+  const match = html.match(/\.info \.tooltip\s*\{([\s\S]*?)\}/);
+  assert.ok(match, ".info .tooltip rule should exist");
+  return match[1];
+}
+
+test("error tooltip is bounded by the popover instead of the info icon", () => {
+  const html = readFileSync(join(root, "src/ui/popover/popover.html"), "utf8");
+  const updated = html.match(/\.updated\s*\{([\s\S]*?)\}/);
+  assert.ok(updated, ".updated rule should exist");
+
+  // Anchored to the full-width row: anchoring to the icon put the box off-screen,
+  // because the icon sits at the right edge and the box grew leftwards.
+  assert.match(updated[1], /position:\s*relative/);
+  const tooltip = tooltipRule();
+  assert.match(tooltip, /left:\s*0/);
+  assert.match(tooltip, /right:\s*0/);
+  assert.doesNotMatch(tooltip, /max-width/);
+  assert.doesNotMatch(tooltip, /width:\s*max-content/);
+});
+
+test("error tooltip clamps its height so it cannot spill past the window edge", () => {
+  const tooltip = tooltipRule();
+
+  assert.match(tooltip, /-webkit-line-clamp:\s*3/);
+  assert.match(tooltip, /overflow:\s*hidden/);
+});
