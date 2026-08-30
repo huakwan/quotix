@@ -1,6 +1,6 @@
 {
   "name": "quotix",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "description": "Show Claude Code, Codex, and OpenCode Go usage quota in the macOS menu bar.",
   "license": "MIT",
   "private": true,
