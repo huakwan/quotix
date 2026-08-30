@@ -1,4 +1,5 @@
 import type { ProviderId, SourceState } from "../../quota/model";
+import type { TrayIconColor } from "../../preferences";
 
 export interface TrayDisplayState {
   provider: ProviderId;
@@ -45,4 +46,13 @@ export function trayDisplayState(provider: ProviderId, state: SourceState): Tray
     loading: state.loading && quota === null,
     unavailable: !state.loading && quota === null && !state.result.ok,
   };
+}
+
+// The canvas takes `dark` to mean a dark menu bar, so it draws a light glyph.
+// nativeTheme reports the app's appearance, which can disagree with how the menu
+// bar actually renders on some machines, so the preference wins when it is set.
+export function trayDrawsLightGlyph(color: TrayIconColor, systemDark: boolean): boolean {
+  if (color === "light") { return true; }
+  if (color === "dark") { return false; }
+  return systemDark;
 }

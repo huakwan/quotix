@@ -45,8 +45,11 @@ root and all quota data flows through a provider framework:
    `sources` is a multi-select list of `ProviderId` kept in `PROVIDER_IDS` order and
    never empty; legacy single-`source` settings (including `"both"`) still migrate on
    read. The menu-bar source falls back to the first enabled source and its picker is
-   hidden when only one source is on. Adding a source should only mean a new id in
-   `PROVIDER_IDS` plus a runtime factory, a logo, and a button in the popover rows.
+   hidden when only one source is on. `trayIconColor` ("auto" | "light" | "dark")
+   overrides the tray glyph color, because nativeTheme reports the app appearance
+   and some machines render the menu bar the other way.
+   Adding a source should only mean a new id in `PROVIDER_IDS` plus a runtime
+   factory, a logo, and a button in the popover rows.
 8. `src/ui/` — pure tray/popover selectors plus Electron/DOM renderers.
    `src/ui/branding.ts` maps a provider to its label, its asset, and whether its
    mark is a black glyph that needs inverting in dark mode.

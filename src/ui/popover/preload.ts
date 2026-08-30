@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { ProviderId } from "../../quota/model";
-import type { ResetMode } from "../../preferences";
+import type { ResetMode, TrayIconColor } from "../../preferences";
 import type { PopoverPayload } from "./popoverState";
 
 export type UpdatePayload = PopoverPayload;
@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld("quotix", {
   setMenuBarSource: (source: ProviderId): void => { ipcRenderer.send("preferences:setMenuBarSource", source); },
   setResetMode: (mode: ResetMode): void => { ipcRenderer.send("preferences:setResetMode", mode); },
   setShowPaceLine: (value: boolean): void => { ipcRenderer.send("preferences:setShowPaceLine", value); },
+  setTrayIconColor: (value: TrayIconColor): void => { ipcRenderer.send("preferences:setTrayIconColor", value); },
   setOpenAtLogin: (value: boolean): void => { ipcRenderer.send("preferences:setOpenAtLogin", value); },
   refresh: (): Promise<void> => ipcRenderer.invoke("quota:refresh"),
   openAbout: (): void => { ipcRenderer.send("about:open"); },

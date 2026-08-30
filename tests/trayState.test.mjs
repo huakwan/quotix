@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { trayDisplayState, trayWindowPresentation, trayWindowVisibility } from "../out/src/ui/tray/trayState.js";
+import { trayDisplayState, trayDrawsLightGlyph, trayWindowPresentation, trayWindowVisibility } from "../out/src/ui/tray/trayState.js";
 
 const quota = {
   updatedAt: 100,
@@ -75,4 +75,11 @@ test("tray presentation compacts only weekly-only visibility", () => {
   assert.equal(trayWindowPresentation({
     ...base, provider: "codex", session: 12, weekly: null,
   }).compactWeekly, false);
+});
+
+test("tray glyph color follows the system theme only on auto", () => {
+  assert.equal(trayDrawsLightGlyph("auto", true), true);
+  assert.equal(trayDrawsLightGlyph("auto", false), false);
+  assert.equal(trayDrawsLightGlyph("light", false), true);
+  assert.equal(trayDrawsLightGlyph("dark", true), false);
 });

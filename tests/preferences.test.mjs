@@ -14,6 +14,7 @@ test("preferences default to every source with Claude in the menu bar", () => {
     menuBarSource: "claude",
     resetMode: "countdown",
     showPaceLine: true,
+    trayIconColor: "auto",
     openAtLogin: false,
   });
 });
@@ -47,6 +48,7 @@ test("invalid preference fields fall back independently", () => {
     menuBarSource: "codex",
     resetMode: "clock",
     showPaceLine: true,
+    trayIconColor: "auto",
     openAtLogin: false,
   });
 });
@@ -58,6 +60,15 @@ test("pace line honors a stored boolean and falls back on bad input", () => {
   assert.equal(loadPreferences("/data", {
     readFile: () => JSON.stringify({ showPaceLine: "yes" }),
   }).showPaceLine, true);
+});
+
+test("tray icon color honors a stored choice and falls back on bad input", () => {
+  assert.equal(loadPreferences("/data", {
+    readFile: () => JSON.stringify({ trayIconColor: "dark" }),
+  }).trayIconColor, "dark");
+  assert.equal(loadPreferences("/data", {
+    readFile: () => JSON.stringify({ trayIconColor: "invert" }),
+  }).trayIconColor, "auto");
 });
 
 test("open at login honors a stored boolean and falls back on bad input", () => {

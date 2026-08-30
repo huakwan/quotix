@@ -29,6 +29,7 @@ import {
   asOpenAtLogin,
   asResetMode,
   asShowPaceLine,
+  asTrayIconColor,
 } from "./preferenceInput";
 import {
   effectiveMenuBarSource,
@@ -38,7 +39,7 @@ import {
 } from "./preferences";
 import { createPopover, resizePopover, togglePopover } from "./ui/popover/popoverWindow";
 import { renderTray } from "./ui/tray/trayCapture";
-import { trayDisplayState } from "./ui/tray/trayState";
+import { trayDisplayState, trayDrawsLightGlyph } from "./ui/tray/trayState";
 import { UpdateCoordinator } from "./update/coordinator";
 import {
   acknowledgeUpdatedLaunch,
@@ -118,7 +119,7 @@ async function updateTray(provider: ProviderId, snapshot: QuotaSnapshot): Promis
     const image = await renderTray(
       trayDisplayState(provider, snapshot[provider]),
       preferences.showPaceLine,
-      nativeTheme.shouldUseDarkColors,
+      trayDrawsLightGlyph(preferences.trayIconColor, nativeTheme.shouldUseDarkColors),
     );
     tray?.setImage(image);
   } catch {
@@ -216,6 +217,12 @@ function registerIpc(): void {
     const showPaceLine = asShowPaceLine(value);
     if (showPaceLine === null) { return; }
     preferences = { ...preferences, showPaceLine };
+    persistPreferences();
+  });
+  ipcMain.on("preferences:setTrayIconColor", (_event, value: unknown) => {
+    const trayIconColor = asTrayIconColor(value);
+    if (!trayIconColor) { return; }
+    preferences = { ...preferences, trayIconColor };
     persistPreferences();
   });
   ipcMain.on("preferences:setOpenAtLogin", (_event, value: unknown) => {

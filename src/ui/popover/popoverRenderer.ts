@@ -3,7 +3,7 @@ import type { ProviderId, QuotaWindow, SourceState } from "../../quota/model";
 import { isProviderId } from "../../quota/model";
 import { PROVIDER_LOGOS, logoNeedsInverting } from "../branding";
 import { keepButtonsUnfocused } from "../buttonFocus";
-import type { ResetMode } from "../../preferences";
+import type { ResetMode, TrayIconColor } from "../../preferences";
 
 declare global {
   interface QuotixApi {
@@ -12,6 +12,7 @@ declare global {
     setMenuBarSource(source: ProviderId): void;
     setResetMode(mode: ResetMode): void;
     setShowPaceLine(value: boolean): void;
+    setTrayIconColor(value: TrayIconColor): void;
     setOpenAtLogin(value: boolean): void;
     refresh(): Promise<void>;
     openAbout(): void;
@@ -198,6 +199,7 @@ function draw(): void {
   syncSourceButtons(last.preferences.sources, selectedMenuBarSource(last.preferences));
   syncButtons("reset-mode", last.preferences.resetMode);
   syncButtons("pace-mode", last.preferences.showPaceLine ? "on" : "off");
+  syncButtons("tray-icon-color", last.preferences.trayIconColor);
   syncButtons("login-mode", last.preferences.openAtLogin ? "on" : "off");
   document.getElementById("menu-source-row")!.classList.toggle("hidden", !showMenuBarSetting(last.preferences));
   const refreshButton = document.getElementById("refresh")! as HTMLButtonElement;
@@ -246,6 +248,7 @@ onSegment("source-mode", (value) => {
 onSegment("menu-source", (value) => window.quotix.setMenuBarSource(value as ProviderId));
 onSegment("reset-mode", (value) => window.quotix.setResetMode(value as ResetMode));
 onSegment("pace-mode", (value) => window.quotix.setShowPaceLine(value === "on"));
+onSegment("tray-icon-color", (value) => window.quotix.setTrayIconColor(value as TrayIconColor));
 onSegment("login-mode", (value) => window.quotix.setOpenAtLogin(value === "on"));
 const refreshButton = document.getElementById("refresh")! as HTMLButtonElement;
 refreshButton.addEventListener("click", () => {

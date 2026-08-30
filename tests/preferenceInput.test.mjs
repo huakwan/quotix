@@ -7,6 +7,7 @@ import {
   asOpenAtLogin,
   asResetMode,
   asShowPaceLine,
+  asTrayIconColor,
 } from "../out/src/preferenceInput.js";
 
 test("sources accept a non-empty list of known providers in presentation order", () => {
@@ -38,6 +39,14 @@ test("pace line accepts only booleans", () => {
   assert.equal(asShowPaceLine(false), false);
   assert.equal(asShowPaceLine("on"), null);
   assert.equal(asShowPaceLine(1), null);
+});
+
+test("tray icon color accepts only auto, light, or dark", () => {
+  assert.equal(asTrayIconColor("auto"), "auto");
+  assert.equal(asTrayIconColor("light"), "light");
+  assert.equal(asTrayIconColor("dark"), "dark");
+  assert.equal(asTrayIconColor("system"), null);
+  assert.equal(asTrayIconColor(true), null);
 });
 
 test("open at login accepts only booleans", () => {

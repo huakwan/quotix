@@ -5,11 +5,16 @@ import { PROVIDER_IDS, isProviderId, menuBarProvider, normalizeProviderIds } fro
 
 export type ResetMode = "countdown" | "clock";
 
+// macOS can report a dark app appearance while the menu bar itself renders light,
+// so the glyph color stays overridable per machine instead of following the theme.
+export type TrayIconColor = "auto" | "light" | "dark";
+
 export interface Preferences {
   sources: ProviderId[];
   menuBarSource: ProviderId;
   resetMode: ResetMode;
   showPaceLine: boolean;
+  trayIconColor: TrayIconColor;
   openAtLogin: boolean;
 }
 
@@ -18,6 +23,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   menuBarSource: "claude",
   resetMode: "countdown",
   showPaceLine: true,
+  trayIconColor: "auto",
   openAtLogin: false,
 };
 
@@ -41,6 +47,10 @@ function readSources(value: Record<string, unknown>): ProviderId[] {
   return [...DEFAULT_PREFERENCES.sources];
 }
 
+function isTrayIconColor(value: unknown): value is TrayIconColor {
+  return value === "auto" || value === "light" || value === "dark";
+}
+
 export function effectiveMenuBarSource(preferences: Preferences): ProviderId {
   return menuBarProvider(preferences.sources, preferences.menuBarSource);
 }
@@ -56,6 +66,8 @@ export function loadPreferences(userDataDir: string, deps: ReadDeps = defaultRea
         ? value.resetMode : DEFAULT_PREFERENCES.resetMode,
       showPaceLine: typeof value.showPaceLine === "boolean"
         ? value.showPaceLine : DEFAULT_PREFERENCES.showPaceLine,
+      trayIconColor: isTrayIconColor(value.trayIconColor)
+        ? value.trayIconColor : DEFAULT_PREFERENCES.trayIconColor,
       openAtLogin: typeof value.openAtLogin === "boolean"
         ? value.openAtLogin : DEFAULT_PREFERENCES.openAtLogin,
     };

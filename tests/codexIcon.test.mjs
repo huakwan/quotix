@@ -36,7 +36,7 @@ test("tray follows the active macOS appearance", () => {
 
   assert.match(
     main,
-    /renderTray\([\s\S]*preferences\.showPaceLine,[\s\S]*nativeTheme\.shouldUseDarkColors,[\s\S]*\)/,
+    /renderTray\([\s\S]*preferences\.showPaceLine,[\s\S]*trayDrawsLightGlyph\(preferences\.trayIconColor, nativeTheme\.shouldUseDarkColors\),[\s\S]*\)/,
   );
   assert.match(tray, /document\.documentElement\.style\.color = dark \? "#f2f2f2" : "#1c1c1e"/);
   assert.match(tray, /invertLogo && dark \? "invert\(1\)" : "none"/);
