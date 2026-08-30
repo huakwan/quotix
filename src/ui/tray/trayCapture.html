@@ -310,7 +310,11 @@
               fillRoundedRect(ctx, trackX, 8, group.track, 6, 3, "rgba(140, 140, 145, 0.35)");
               var value = Math.max(0, Math.min(100, group.value === null ? 0 : group.value));
               var color = value > 90 ? "#ff453a" : value >= 75 ? "#ffcc00" : "#35c759";
-              fillRoundedRect(ctx, trackX, 8, group.track * value / 100, 6, 3, color);
+              // Floor a non-zero fill at the pill diameter: below 2x the radius
+              // fillRoundedRect shrinks the corners and the bar reads as a nub.
+              var fillWidth = group.track * value / 100;
+              if (fillWidth > 0) fillWidth = Math.max(fillWidth, 6);
+              fillRoundedRect(ctx, trackX, 8, fillWidth, 6, 3, color);
               if (showPaceLine && group.reset !== null) {
                 var elapsed = Math.max(0, Math.min(100, ((group.duration - (group.reset - nowSec)) / group.duration) * 100));
                 var guideX = trackX + group.track * elapsed / 100;

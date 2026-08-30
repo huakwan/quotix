@@ -149,7 +149,7 @@ function rowHtml(
   const pct = Math.round(window.usedPct);
   const width = Math.max(0, Math.min(100, window.usedPct));
   return `<div class="item"><div class="row"><span class="label">${escapedLabel}</span>`
-    + `<div class="track"><div class="fill ${colorClass(pct)}" style="width:${width}%"></div>`
+    + `<div class="track">${width > 0 ? `<div class="fill ${colorClass(pct)}" style="width:${width}%"></div>` : ""}`
     + `${guideHtml(periodSeconds, window.resetsAt, nowSec, showPaceLine)}</div>`
     + `<span class="pct">${pct}%</span></div>`
     + `<div class="reset">${resetText(window.resetsAt, nowSec, mode)}</div></div>`;
