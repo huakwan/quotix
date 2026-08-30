@@ -103,6 +103,11 @@ export async function runInstallTransaction(
   tx.phase = "complete";
   await deps.writeTransaction(tx).catch(() => undefined);
   await deps.writeResult({ status: "success", version: tx.version }).catch(() => undefined);
+  // The new app confirmed its launch, so the helper owns cleanup: it is the last
+  // process that is guaranteed to run. Leaving it to the next app launch strands a
+  // full app bundle in /Applications whenever that launch skips the transaction.
+  await deps.rm(tx.backupApp).catch(() => undefined);
+  await deps.rm(tx.stagingRoot).catch(() => undefined);
 }
 
 async function waitForExit(pid: number): Promise<void> {

@@ -1,8 +1,17 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rename, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+
+async function exists(path) {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 import {
   appLaunchEnvironment,
@@ -39,6 +48,7 @@ function fakeDeps(options = {}) {
       },
       rm: async (path) => {
         calls.push(["rm", path]);
+        if (options.failRm === path) { throw new Error("rm failed"); }
       },
       writeTransaction: async (value) => {
         calls.push(["phase", value.phase, value.helperPid]);
@@ -63,17 +73,37 @@ function fakeDeps(options = {}) {
   };
 }
 
-test("installer helper replaces and validates before leaving cleanup to the new app", async () => {
+test("installer helper replaces the app and removes the backup once the launch is confirmed", async () => {
   const { deps, calls } = fakeDeps();
   await runInstallTransaction(transaction(), deps);
   assert.deepEqual(calls.filter(([name]) => name === "rename"), [
     ["rename", "/Applications/Quotix.app", "/Applications/Quotix.app.update-backup-aaaaaaaaaaaa"],
     ["rename", "/tmp/update/Quotix.app", "/Applications/Quotix.app"],
   ]);
-  assert.equal(calls.some(([name, path]) => name === "rm" && path.includes("update-backup")), false);
-  assert.ok(calls.some(([name, result]) => name === "result" && result.status === "success"));
   assert.ok(calls.some(([name, phase, helperPid]) =>
     name === "phase" && phase === "complete" && helperPid === 999));
+  assert.ok(calls.some(([name, result]) => name === "result" && result.status === "success"));
+  const completed = calls.findIndex(([name, result]) =>
+    name === "result" && result.status === "success");
+  assert.deepEqual(calls.slice(completed + 1), [
+    ["rm", "/Applications/Quotix.app.update-backup-aaaaaaaaaaaa"],
+    ["rm", "/tmp/update"],
+  ]);
+});
+
+test("installer helper keeps the update successful when cleanup fails", async () => {
+  const tx = transaction();
+  const { deps, calls } = fakeDeps({ failRm: tx.backupApp });
+  await runInstallTransaction(tx, deps);
+  assert.ok(calls.some(([name, result]) => name === "result" && result.status === "success"));
+  assert.equal(
+    calls.some((call) =>
+      call[0] === "rename"
+      && call[1].includes("update-backup")
+      && call[2] === "/Applications/Quotix.app"),
+    false,
+  );
+  assert.ok(calls.some(([name, path]) => name === "rm" && path === tx.stagingRoot));
 });
 
 test("installer helper rolls back launch failure and marker timeout", async () => {
@@ -174,12 +204,16 @@ test("installer helper replaces an app using the real filesystem transaction", a
     phase: "prepared",
   };
   let marker = null;
+  const results = [];
   await runInstallTransaction(tx, {
     waitForExit: async () => undefined,
     rename,
     rm: (path) => rm(path, { recursive: true, force: true }),
     writeTransaction: (value) => writeJsonAtomic(join(stagingRoot, "install-transaction.json"), value),
-    writeResult: (value) => writeJsonAtomic(tx.resultPath, value),
+    writeResult: (value) => {
+      results.push(value);
+      return writeJsonAtomic(tx.resultPath, value);
+    },
     launch: async () => {
       marker = token;
       return { kill: () => undefined };
@@ -190,6 +224,7 @@ test("installer helper replaces an app using the real filesystem transaction", a
     processId: 999,
   });
   assert.equal(await readFile(join(installedApp, "version"), "utf8"), "new");
-  assert.equal(await readFile(join(tx.backupApp, "version"), "utf8"), "old");
-  assert.equal(JSON.parse(await readFile(tx.resultPath, "utf8")).status, "success");
+  assert.deepEqual(results, [{ status: "success", version: "1.0.7" }]);
+  assert.equal(await exists(tx.backupApp), false);
+  assert.equal(await exists(stagingRoot), false);
 });
