@@ -1,6 +1,6 @@
 {
   "name": "quotix",
-  "version": "1.0.18",
+  "version": "1.0.19",
   "description": "Show Claude Code, Codex, and OpenCode Go usage quota in the macOS menu bar.",
   "license": "MIT",
   "private": true,
@@ -11,7 +11,7 @@
     "test:unit": "tsc --outDir out && node --test tests/*.test.mjs",
     "test": "pnpm run test:unit",
     "watch": "node esbuild.js --watch",
-    "start": "npm run compile && electron .",
+    "dev": "npm run compile && electron .",
     "dist:mac": "npm run compile && electron-builder --mac --universal --dir"
   },
   "build": {

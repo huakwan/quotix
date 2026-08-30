@@ -8,7 +8,7 @@ pnpm run compile
 pnpm run typecheck
 pnpm test
 pnpm run watch
-pnpm start
+pnpm run dev
 pnpm run dist:mac
 ```
 

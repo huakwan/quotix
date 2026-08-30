@@ -57,7 +57,7 @@ and never stores or displays the key.
 
 ```bash
 pnpm install
-pnpm start
+pnpm run dev
 ```
 
 Development runs force the latest stable release into the available-update
@@ -95,7 +95,7 @@ see [`docs/update-signing.md`](docs/update-signing.md).
 | `pnpm run typecheck` | Run strict TypeScript checking without emitting files.         |
 | `pnpm test`          | Compile TypeScript to `out/` and run the Node unit suite.      |
 | `pnpm run watch`     | Rebuild bundles continuously.                                  |
-| `pnpm start`         | Compile and launch Quotix.                                     |
+| `pnpm run dev`       | Compile and launch Quotix.                                     |
 | `pnpm run dist:mac`  | Build an unpacked macOS `.app`.                                |
 
 ## Architecture

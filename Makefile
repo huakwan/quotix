@@ -1,4 +1,4 @@
-.PHONY: install compile watch start dist-mac dist-mac-x64 dist-mac-arm64 dist-mac-universal clean-packages
+.PHONY: install compile watch dev dist-mac dist-mac-x64 dist-mac-arm64 dist-mac-universal clean-packages
 
 install:
 	pnpm install
@@ -9,8 +9,8 @@ compile:
 watch:
 	pnpm run watch
 
-start:
-	pnpm start
+dev:
+	pnpm run dev
 
 dist-mac: dist-mac-arm64
 
