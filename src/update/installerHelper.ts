@@ -1,7 +1,8 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { readFile, rename, rm, writeFile } from "node:fs/promises";
+import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { UpdateError } from "./model";
+import { removeTree } from "./removeTree";
 import {
   parseInstallTransaction,
   writeJsonAtomic,
@@ -156,7 +157,7 @@ async function main(): Promise<void> {
   const deps: InstallerHelperDeps = {
     waitForExit,
     rename,
-    rm: (path) => rm(path, { recursive: true, force: true }),
+    rm: removeTree,
     writeTransaction: (value) => writeJsonAtomic(transactionPath, value),
     writeResult: (value) => writeJsonAtomic(tx.resultPath, value),
     launch,

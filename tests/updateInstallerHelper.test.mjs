@@ -1,8 +1,17 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rename, rm, stat } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
+import { chmod, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
+
+import { packAsar } from "./helpers/asar.mjs";
+
+const execFileAsync = promisify(execFile);
+const require = createRequire(import.meta.url);
 
 async function exists(path) {
   try {
@@ -227,4 +236,83 @@ test("installer helper replaces an app using the real filesystem transaction", a
   assert.deepEqual(results, [{ status: "success", version: "1.0.7" }]);
   assert.equal(await exists(tx.backupApp), false);
   assert.equal(await exists(stagingRoot), false);
+});
+
+async function appBundle(path, { marker } = {}) {
+  await mkdir(join(path, "Contents", "Resources"), { recursive: true });
+  await mkdir(join(path, "Contents", "MacOS"), { recursive: true });
+  await writeFile(join(path, "Contents", "Info.plist"), "<plist/>");
+  await writeFile(
+    join(path, "Contents", "Resources", "app.asar"),
+    packAsar({ "index.js": "console.log(1)\n" }),
+  );
+  const executable = join(path, "Contents", "MacOS", "Quotix");
+  await writeFile(executable, marker
+    ? `#!/bin/sh
+for arg in "$@"; do
+  case "$arg" in
+    --quotix-update-token=*) token=\${arg#*=} ;;
+    --quotix-update-marker=*) markerPath=\${arg#*=} ;;
+  esac
+done
+printf '%s' "$token" > "$markerPath"
+sleep 20
+`
+    : "#!/bin/sh\nsleep 20\n");
+  await chmod(executable, 0o755);
+}
+
+test("installer helper leaves no backup or staging behind under Electron", async (t) => {
+  let electronPath;
+  try {
+    electronPath = require("electron");
+  } catch {
+    t.skip("electron is not installed");
+    return;
+  }
+  if (typeof electronPath !== "string" || !existsSync(electronPath)) {
+    t.skip("electron binary is unavailable");
+    return;
+  }
+
+  const root = await mkdtemp(join(tmpdir(), "quotix-helper-electron-"));
+  const applications = join(root, "Applications");
+  const stagingRoot = join(root, "updates", "update-electron");
+  const installedApp = join(applications, "Quotix.app");
+  const stagedApp = join(stagingRoot, "Quotix.app");
+  const token = "e".repeat(64);
+  await mkdir(applications, { recursive: true });
+  await mkdir(stagingRoot, { recursive: true });
+  await appBundle(installedApp);
+  await appBundle(stagedApp, { marker: true });
+
+  // A pid that has already exited makes waitForExit return at once.
+  const { stdout: pidOutput } = await execFileAsync("/bin/sh", ["-c", "sh -c 'exit 0' & echo $!; wait"]);
+  const tx = {
+    schemaVersion: 1,
+    version: "1.0.7",
+    stagingRoot,
+    installedApp,
+    stagedApp,
+    backupApp: `${installedApp}.update-backup-${token.slice(0, 12)}`,
+    markerPath: join(stagingRoot, "launch-success"),
+    resultPath: join(stagingRoot, "install-result.json"),
+    token,
+    originalPid: Number(pidOutput.trim()),
+    phase: "prepared",
+  };
+  const transactionPath = join(stagingRoot, "install-transaction.json");
+  await writeJsonAtomic(transactionPath, tx);
+
+  const helper = resolve("out/src/update/installerHelper.js");
+  await execFileAsync(electronPath, [helper, transactionPath], {
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+    encoding: "utf8",
+    maxBuffer: 8 * 1024 * 1024,
+  });
+
+  assert.equal(existsSync(join(installedApp, "Contents", "Resources", "app.asar")), true);
+  assert.equal(existsSync(tx.backupApp), false, "backup bundle must be gone");
+  assert.equal(existsSync(stagingRoot), false, "staging root must be gone");
+  await rm(root, { recursive: true, force: true });
 });

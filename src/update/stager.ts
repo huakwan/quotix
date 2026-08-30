@@ -6,6 +6,7 @@ import { downloadAsset } from "./downloader";
 import type { StageHooks } from "./coordinator";
 import type { AvailableRelease, UpdateArch, VerifiedUpdate } from "./model";
 import { UpdateError } from "./model";
+import { removeTree } from "./removeTree";
 
 function assertNotCancelled(signal: AbortSignal): void {
   if (signal.aborted) { throw new UpdateError("download_cancelled"); }
@@ -41,7 +42,7 @@ export async function stageUpdate(
     await rm(archivePath, { force: true });
     return { version: release.version, stagingRoot, appPath };
   } catch (error) {
-    await rm(stagingRoot, { recursive: true, force: true }).catch(() => undefined);
+    await removeTree(stagingRoot).catch(() => undefined);
     throw error;
   }
 }

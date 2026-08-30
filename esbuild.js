@@ -18,7 +18,7 @@ const copyHtml = {
 async function main() {
   const node = {
     bundle: true, format: "cjs", platform: "node", target: "node20",
-    external: ["electron"], sourcemap: true, logLevel: "info",
+    external: ["electron", "original-fs"], sourcemap: true, logLevel: "info",
     loader: { ".svg": "base64", ".html": "text", ".pem": "text" },
   };
   const contexts = await Promise.all([

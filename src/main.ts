@@ -1,5 +1,4 @@
 import { spawn } from "node:child_process";
-import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import {
   app,
@@ -52,6 +51,7 @@ import {
   cleanupOrphanedUpdateBackups,
   recoverInterruptedUpdates,
 } from "./update/recovery";
+import { removeTree } from "./update/removeTree";
 import { ReleaseChecker } from "./update/releaseChecker";
 import { stageUpdate } from "./update/stager";
 import updatePublicKey from "./update/key/quotix-update-public.pem";
@@ -346,7 +346,7 @@ app.whenReady().then(async () => {
       quit: () => app.quit(),
     }),
     reveal: async (update) => shell.showItemInFolder(update.appPath),
-    cleanup: async (update) => rm(update.stagingRoot, { recursive: true, force: true }),
+    cleanup: async (update) => removeTree(update.stagingRoot),
   });
   unsubscribeUpdate = updateCoordinator.subscribe(() => renderPopover());
 

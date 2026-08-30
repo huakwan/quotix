@@ -1,6 +1,7 @@
-import { lstat, readFile, readdir, realpath, rename, rm, stat } from "node:fs/promises";
+import { lstat, readFile, readdir, realpath, rename, stat } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { isContainedPath } from "./installPaths";
+import { removeTree } from "./removeTree";
 import {
   parseInstallTransaction,
   writeJsonAtomic,
@@ -135,7 +136,7 @@ async function recoverOne(
     try {
       await (options.removeBackup
         ? options.removeBackup(transaction.backupApp)
-        : rm(transaction.backupApp, { recursive: true, force: true }));
+        : removeTree(transaction.backupApp));
       backupCleaned = !await exists(transaction.backupApp);
     } catch {
       backupCleaned = false;
@@ -188,7 +189,7 @@ export async function recoverInterruptedUpdates(
       const outcome = await recoverOne(stagingRoot, transactionPath, options);
       if (outcome.notice) { notices.push(outcome.notice); }
       if (outcome.cleanup) {
-        await rm(stagingRoot, { recursive: true, force: true }).catch(() => undefined);
+        await removeTree(stagingRoot).catch(() => undefined);
       }
     } catch {
       notices.push({ status: "manual-recovery", version: "unknown" });
@@ -251,6 +252,6 @@ export async function cleanupOrphanedUpdateBackups(
     if (protectedPaths.has(candidate.toLowerCase())) { continue; }
     await (options.removeBackup
       ? options.removeBackup(candidate)
-      : rm(candidate, { recursive: true, force: true })).catch(() => undefined);
+      : removeTree(candidate)).catch(() => undefined);
   }
 }
