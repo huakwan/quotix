@@ -1,6 +1,8 @@
 import { trayWindowPresentation, type TrayDisplayState } from "./trayState";
+import { logoNeedsInverting } from "../branding";
 import anthropicIcon from "../../../assets/anthropic.svg";
 import openaiIcon from "../../../assets/openai.svg";
+import opencodeIcon from "../../../assets/opencode.svg";
 import pageTemplate from "./trayCapture.html";
 import { BrowserWindow, NativeImage, nativeImage } from "electron";
 
@@ -16,6 +18,7 @@ const PAGE = pageTemplate
   .replaceAll("__H__", String(H))
   .replaceAll("__ICON_CLAUDE__", anthropicIcon)
   .replaceAll("__ICON_CODEX__", openaiIcon)
+  .replaceAll("__ICON_OPENCODE__", opencodeIcon)
   .replaceAll("__SESSION_DUR__", String(5 * 3600))
   .replaceAll("__WEEKLY_DUR__", String(7 * 24 * 3600));
 
@@ -48,8 +51,11 @@ async function drawTray(
   const wc = win!.webContents;
   const presentation = trayWindowPresentation(display);
   const nowSec = Math.floor(Date.now() / 1000);
+  // The page is provider-agnostic: it is told which mark to draw and whether that
+  // mark needs inverting, so a new source never means editing the canvas script.
+  const invertLogo = logoNeedsInverting(display.provider);
   const rendered: { width: number; oneX: string; twoX: string } = await wc.executeJavaScript(
-    `window.__renderCanvas(${JSON.stringify(display.provider)}, ${j(display.session)}, ${j(display.weekly)}, ${j(display.sessionResetsAt)}, ${j(display.weeklyResetsAt)}, ${nowSec}, ${showPaceLine}, ${presentation.session}, ${presentation.weekly}, ${presentation.compactWeekly}, ${dark}, ${display.loading}, ${display.unavailable})`,
+    `window.__renderCanvas(${JSON.stringify(display.provider)}, ${j(display.session)}, ${j(display.weekly)}, ${j(display.sessionResetsAt)}, ${j(display.weeklyResetsAt)}, ${nowSec}, ${showPaceLine}, ${presentation.session}, ${presentation.weekly}, ${presentation.compactWeekly}, ${dark}, ${display.loading}, ${display.unavailable}, ${invertLogo})`,
   );
   const image = nativeImage.createEmpty();
   if (process.platform === "darwin" && process.getSystemVersion().startsWith("12.")) {

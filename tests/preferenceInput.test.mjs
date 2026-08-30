@@ -2,24 +2,28 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  asDisplaySource,
+  asSources,
   asMenuBarSource,
   asOpenAtLogin,
   asResetMode,
   asShowPaceLine,
 } from "../out/src/preferenceInput.js";
 
-test("display source accepts only Claude, Codex, or Both", () => {
-  assert.equal(asDisplaySource("claude"), "claude");
-  assert.equal(asDisplaySource("codex"), "codex");
-  assert.equal(asDisplaySource("both"), "both");
-  assert.equal(asDisplaySource("all"), null);
-  assert.equal(asDisplaySource(1), null);
+test("sources accept a non-empty list of known providers in presentation order", () => {
+  assert.deepEqual(asSources(["claude"]), ["claude"]);
+  assert.deepEqual(asSources(["opencode", "claude"]), ["claude", "opencode"]);
+  assert.deepEqual(asSources(["codex", "codex"]), ["codex"]);
+  assert.deepEqual(asSources(["gemini", "codex"]), ["codex"]);
+  assert.equal(asSources([]), null);
+  assert.equal(asSources(["gemini"]), null);
+  assert.equal(asSources("claude"), null);
+  assert.equal(asSources("both"), null);
 });
 
 test("menu-bar source accepts only a single provider", () => {
   assert.equal(asMenuBarSource("claude"), "claude");
   assert.equal(asMenuBarSource("codex"), "codex");
+  assert.equal(asMenuBarSource("opencode"), "opencode");
   assert.equal(asMenuBarSource("both"), null);
 });
 

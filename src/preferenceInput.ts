@@ -1,12 +1,13 @@
-import type { DisplaySource, ProviderId } from "./quota/model";
+import type { ProviderId } from "./quota/model";
+import { isProviderId, normalizeProviderIds } from "./quota/model";
 import type { ResetMode } from "./preferences";
 
-export function asDisplaySource(value: unknown): DisplaySource | null {
-  return value === "claude" || value === "codex" || value === "both" ? value : null;
+export function asSources(value: unknown): ProviderId[] | null {
+  return normalizeProviderIds(value);
 }
 
 export function asMenuBarSource(value: unknown): ProviderId | null {
-  return value === "claude" || value === "codex" ? value : null;
+  return isProviderId(value) ? value : null;
 }
 
 export function asResetMode(value: unknown): ResetMode | null {

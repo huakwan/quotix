@@ -1,22 +1,14 @@
-import {
-  canActivateUpdateAction,
-  diagnosticText,
-  isQuotaRefreshInProgress,
-  quotaRowsForProvider,
-  sectionsForPayload,
-  showMenuBarSetting,
-  updatePresentation,
-  type PopoverPayload,
-  type UpdateAction,
-} from "./popoverState";
-import type { DisplaySource, ProviderId, QuotaWindow, SourceState } from "../../quota/model";
-import type { ResetMode } from "../../preferences";
+import { canActivateUpdateAction, diagnosticText, isQuotaRefreshInProgress, quotaRowsForProvider, sectionsForPayload, selectedMenuBarSource, showMenuBarSetting, toggledSources, updatePresentation, type PopoverPayload, type UpdateAction, } from "./popoverState";
+import type { ProviderId, QuotaWindow, SourceState } from "../../quota/model";
+import { isProviderId } from "../../quota/model";
+import { PROVIDER_LOGOS, logoNeedsInverting } from "../branding";
 import { keepButtonsUnfocused } from "../buttonFocus";
+import type { ResetMode } from "../../preferences";
 
 declare global {
   interface QuotixApi {
     onUpdate(cb: (payload: PopoverPayload) => void): void;
-    setSource(source: DisplaySource): void;
+    setSources(sources: ProviderId[]): void;
     setMenuBarSource(source: ProviderId): void;
     setResetMode(mode: ResetMode): void;
     setShowPaceLine(value: boolean): void;
@@ -122,6 +114,9 @@ function unavailableMessage(provider: ProviderId, state: SourceState): string {
   if (provider === "codex" && !state.result.ok && state.result.reason === "missing") {
     return "Codex CLI was not found or is not signed in.";
   }
+  if (provider === "opencode" && !state.result.ok && state.result.reason === "missing") {
+    return "No OpenCode Go key was found. Add it with opencode auth login.";
+  }
   return "Quota data unavailable. Retrying automatically…";
 }
 
@@ -130,6 +125,10 @@ function unavailableMessage(provider: ProviderId, state: SourceState): string {
 function guideHtml(periodSeconds: number, resetsAt: number | null, nowSec: number, show: boolean): string {
   if (!show || !periodSeconds || resetsAt === null) { return ""; }
   const remaining = resetsAt - nowSec;
+  // A reset more than a full period away means the data still sees the window
+  // as not started (now is before the previous reset); the elapsed fraction is
+  // undefined there, so do not pin the marker to the left edge.
+  if (remaining > periodSeconds) { return ""; }
   const elapsedPct = Math.max(0, Math.min(100, ((periodSeconds - remaining) / periodSeconds) * 100));
   return `<div class="guide" style="left:${elapsedPct}%"></div>`;
 }
@@ -157,7 +156,8 @@ function rowHtml(
 }
 
 function sectionHtml(provider: ProviderId, name: string, state: SourceState, payload: PopoverPayload): string {
-  const logo = provider === "claude" ? "../assets/anthropic.svg" : "../assets/openai.svg";
+  const logo = PROVIDER_LOGOS[provider];
+  const logoClass = logoNeedsInverting(provider) ? "logo monochrome-logo" : "logo";
   const quota = state.lastGood ?? (state.result.ok ? state.result.quota : null);
   const body = quota
     ? quotaRowsForProvider(provider, quota)
@@ -167,7 +167,7 @@ function sectionHtml(provider: ProviderId, name: string, state: SourceState, pay
       .join("")
       + updatedLine(quota, state, payload.nowSec)
     : `<div class="unavailable">${unavailableMessage(provider, state)}</div>`;
-  return `<section class="source-section"><div class="header"><img class="${provider === "codex" ? "logo codex-logo" : "logo"}" src="${logo}" alt=""/>`
+  return `<section class="source-section"><div class="header"><img class="${logoClass}" src="${logo}" alt=""/>`
     + `<span>${name}</span></div>${body}</section>`;
 }
 
@@ -178,12 +178,24 @@ function syncButtons(containerId: string, value: string): void {
   }
 }
 
+// The source row is a multi-select, and the menu-bar row only offers what the
+// source row enabled, so both are driven off the enabled set rather than one value.
+function syncSourceButtons(sources: readonly ProviderId[], menuBarSource: ProviderId): void {
+  for (const button of document.querySelectorAll<HTMLButtonElement>("#source-mode .seg-btn")) {
+    button.classList.toggle("active", sources.includes(button.dataset.value as ProviderId));
+  }
+  for (const button of document.querySelectorAll<HTMLButtonElement>("#menu-source .seg-btn")) {
+    const provider = button.dataset.value as ProviderId;
+    button.classList.toggle("hidden", !sources.includes(provider));
+    button.classList.toggle("active", provider === menuBarSource);
+  }
+}
+
 function draw(): void {
   if (!last) { return; }
   document.getElementById("sources")!.innerHTML = sectionsForPayload(last)
     .map((section) => sectionHtml(section.provider, section.name, section.state, last!)).join("");
-  syncButtons("source-mode", last.preferences.source);
-  syncButtons("menu-source", last.preferences.menuBarSource);
+  syncSourceButtons(last.preferences.sources, selectedMenuBarSource(last.preferences));
   syncButtons("reset-mode", last.preferences.resetMode);
   syncButtons("pace-mode", last.preferences.showPaceLine ? "on" : "off");
   syncButtons("login-mode", last.preferences.openAtLogin ? "on" : "off");
@@ -222,7 +234,15 @@ function onSegment(id: string, callback: (value: string) => void): void {
 
 window.quotix.onUpdate((payload) => { last = payload; draw(); });
 keepButtonsUnfocused();
-onSegment("source-mode", (value) => window.quotix.setSource(value as DisplaySource));
+onSegment("source-mode", (value) => {
+  if (!last || !isProviderId(value)) { return; }
+  const sources = toggledSources(last.preferences.sources, value);
+  if (!sources) { return; }
+  // Paint the new selection now; the main process echoes it back on the next update.
+  last = { ...last, preferences: { ...last.preferences, sources } };
+  draw();
+  window.quotix.setSources(sources);
+});
 onSegment("menu-source", (value) => window.quotix.setMenuBarSource(value as ProviderId));
 onSegment("reset-mode", (value) => window.quotix.setResetMode(value as ResetMode));
 onSegment("pace-mode", (value) => window.quotix.setShowPaceLine(value === "on"));

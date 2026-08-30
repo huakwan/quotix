@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+
 import test from "node:test";
 
 import { createQuotaCache } from "../out/src/quota/cache.js";
@@ -7,6 +8,7 @@ const quota = {
   updatedAt: 123,
   session: { usedPct: 10, resetsAt: 456 },
   weekly: { usedPct: 20, resetsAt: null },
+  monthly: { usedPct: 30, resetsAt: 789 },
   weeklyModels: [
     { model: "Fable", window: { usedPct: 5, resetsAt: 999 } },
     { model: "Inactive", window: null },
@@ -41,6 +43,13 @@ test("provider cache paths and data are isolated", () => {
 test("cache rejects corrupt normalized quota", () => {
   const fs = memoryFs({ "/data/quotix-quota-cache-codex.json": JSON.stringify({ updatedAt: "bad" }) });
   assert.equal(createQuotaCache("/data", "codex", fs.deps).load(), null);
+});
+
+test("a cache written before the monthly window still loads", () => {
+  const legacy = { ...quota, monthly: undefined };
+  delete legacy.monthly;
+  const fs = memoryFs({ "/data/quotix-quota-cache-opencode.json": JSON.stringify(legacy) });
+  assert.deepEqual(createQuotaCache("/data", "opencode", fs.deps).load(), { ...quota, monthly: null });
 });
 
 test("Claude reads the legacy cache when its provider cache is absent", () => {

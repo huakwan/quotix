@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { DisplaySource, ProviderId } from "../../quota/model";
+import type { ProviderId } from "../../quota/model";
 import type { ResetMode } from "../../preferences";
 import type { PopoverPayload } from "./popoverState";
 
@@ -9,7 +9,7 @@ contextBridge.exposeInMainWorld("quotix", {
   onUpdate: (cb: (payload: PopoverPayload) => void): void => {
     ipcRenderer.on("quota:update", (_event, payload: PopoverPayload) => cb(payload));
   },
-  setSource: (source: DisplaySource): void => { ipcRenderer.send("preferences:setSource", source); },
+  setSources: (sources: ProviderId[]): void => { ipcRenderer.send("preferences:setSources", sources); },
   setMenuBarSource: (source: ProviderId): void => { ipcRenderer.send("preferences:setMenuBarSource", source); },
   setResetMode: (mode: ResetMode): void => { ipcRenderer.send("preferences:setResetMode", mode); },
   setShowPaceLine: (value: boolean): void => { ipcRenderer.send("preferences:setShowPaceLine", value); },

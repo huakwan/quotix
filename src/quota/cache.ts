@@ -47,6 +47,8 @@ function parseQuota(raw: string): Quota {
     updatedAt: value.updatedAt,
     session: normWindow(value.session),
     weekly: normWindow(value.weekly),
+    // Caches written before OpenCode Go only carry two windows.
+    monthly: value.monthly === undefined ? null : normWindow(value.monthly),
     weeklyModels: normWeeklyModels(value.weeklyModels),
     planDetected: value.planDetected === true,
   };

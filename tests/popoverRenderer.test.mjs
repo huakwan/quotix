@@ -1,9 +1,9 @@
+import { dirname, join, resolve } from "node:path";
+import { runInNewContext } from "node:vm";
+import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
-import { runInNewContext } from "node:vm";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -25,6 +25,18 @@ function loadColorClass() {
   return runInNewContext(`(${javascript})`);
 }
 
+function loadGuideHtml() {
+  const renderer = readFileSync(join(root, "src/ui/popover/popoverRenderer.ts"), "utf8");
+  const source = renderer.match(/function guideHtml[\s\S]*?\n}/)?.[0];
+  assert.ok(source, "guideHtml function should exist");
+  const javascript = source
+    .replaceAll(": number | null", "")
+    .replaceAll(": number", "")
+    .replaceAll(": boolean", "")
+    .replaceAll(": string", "");
+  return runInNewContext(`(${javascript})`);
+}
+
 test("popover quota bar turns amber at 75 percent", () => {
   const colorClass = loadColorClass();
 
@@ -42,6 +54,28 @@ test("updated age uses seconds only after ten seconds and before one minute", ()
   assert.equal(updatedAgo(100, 111), "updated 11 sec ago");
   assert.equal(updatedAgo(100, 159), "updated 59 sec ago");
   assert.equal(updatedAgo(100, 160), "updated 1 min ago");
+});
+
+test("pace marker sits at the fraction of the window that has elapsed", () => {
+  const guideHtml = loadGuideHtml();
+  const hour = 3600;
+
+  assert.equal(guideHtml(5 * hour, 100 + hour, 100, true), '<div class="guide" style="left:80%"></div>');
+  assert.equal(guideHtml(5 * hour, 100 + 5 * hour, 100, true), '<div class="guide" style="left:0%"></div>');
+  // A reset already passed overruns the window; the marker clamps at the far edge.
+  assert.equal(guideHtml(5 * hour, 100 - hour, 100, true), '<div class="guide" style="left:100%"></div>');
+});
+
+test("pace marker is hidden when disabled or when the reset is more than a period out", () => {
+  const guideHtml = loadGuideHtml();
+  const hour = 3600;
+
+  assert.equal(guideHtml(5 * hour, 100 + hour, 100, false), "");
+  assert.equal(guideHtml(5 * hour, null, 100, true), "");
+  // OpenCode Go's monthly window resets a full period out (plus calendar/skew
+  // overshoot) at the start of each billing period; the elapsed fraction is
+  // undefined, so the marker must not be pinned to the left edge.
+  assert.equal(guideHtml(30 * 24 * hour, 100 + 30 * 24 * hour + 2 * hour, 100, true), "");
 });
 
 test("popover wires only named assisted-update actions", () => {

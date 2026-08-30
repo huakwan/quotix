@@ -138,6 +138,7 @@
       var logos = {
         claude: "data:image/svg+xml;base64,__ICON_CLAUDE__",
         codex: "data:image/svg+xml;base64,__ICON_CODEX__",
+        opencode: "data:image/svg+xml;base64,__ICON_OPENCODE__",
       };
       window.__render = function (
         provider,
@@ -153,11 +154,12 @@
         dark,
         loading,
         unavailable,
+        invertLogo,
       ) {
         document.documentElement.style.color = dark ? "#f2f2f2" : "#1c1c1e";
         var logo = document.getElementById("logo");
         logo.src = logos[provider];
-        logo.style.filter = provider === "codex" && dark ? "invert(1)" : "none";
+        logo.style.filter = invertLogo && dark ? "invert(1)" : "none";
         var row = document.getElementById("row");
         var grp5 = document.getElementById("grp5"),
           grp7 = document.getElementById("grp7");
@@ -211,9 +213,11 @@
       var canvasLogos = {
         claude: new Image(),
         codex: new Image(),
+        opencode: new Image(),
       };
       canvasLogos.claude.src = logos.claude;
       canvasLogos.codex.src = logos.codex;
+      canvasLogos.opencode.src = logos.opencode;
 
       async function readyImage(image) {
         if (image.complete) return;
@@ -242,6 +246,7 @@
         dark,
         loading,
         unavailable,
+        invertLogo,
       ) {
         var font = "500 13px -apple-system, system-ui, sans-serif";
         var measureCanvas = document.createElement("canvas");
@@ -282,7 +287,7 @@
           var logo = canvasLogos[provider];
           if (logo.complete && logo.naturalWidth > 0) {
             ctx.save();
-            ctx.filter = provider === "codex" && dark ? "invert(1)" : "none";
+            ctx.filter = invertLogo && dark ? "invert(1)" : "none";
             ctx.drawImage(logo, 3, (__H__ - 15) / 2, 15, 15);
             ctx.restore();
           }

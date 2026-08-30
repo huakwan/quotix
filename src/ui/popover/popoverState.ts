@@ -1,6 +1,8 @@
 import type { ProviderId, Quota, QuotaSnapshot, QuotaWindow, SourceState } from "../../quota/model";
-import type { Preferences } from "../../preferences";
 import type { UpdateViewState } from "../../update/model";
+import type { Preferences } from "../../preferences";
+import { menuBarProvider, normalizeProviderIds } from "../../quota/model";
+import { PROVIDER_LABELS } from "../branding";
 
 export interface PopoverPayload {
   snapshot: QuotaSnapshot;
@@ -17,6 +19,25 @@ export interface PopoverSection {
 
 const FIVE_HOUR_SECONDS = 5 * 3600;
 const SEVEN_DAY_SECONDS = 7 * 24 * 3600;
+// Fallback only for a monthly window with no reset time; the pace line is
+// hidden then, so the exact value does not matter.
+const MONTH_FALLBACK_SECONDS = 30 * 24 * 3600;
+
+// OpenCode Go's monthly window is calendar-anchored: it resets on the same
+// day of the month each billing period, so the pace line must span the real
+// inter-reset duration (28-31 days), not a fixed 30. Compute it as the time
+// between the upcoming reset and the previous one (one calendar month earlier,
+// same wall-clock time, clamped to the previous month's last day for 29-31st
+// anchors).
+export function monthlyPeriodSeconds(resetsAt: number): number {
+  const reset = new Date(resetsAt * 1000);
+  const targetDay = reset.getDate();
+  const previous = new Date(reset.getFullYear(), reset.getMonth() - 1, 1);
+  const lastDay = new Date(previous.getFullYear(), previous.getMonth() + 1, 0).getDate();
+  previous.setDate(Math.min(targetDay, lastDay));
+  previous.setHours(reset.getHours(), reset.getMinutes(), reset.getSeconds(), reset.getMilliseconds());
+  return resetsAt - previous.getTime() / 1000;
+}
 
 export interface QuotaRow {
   label: string;
@@ -26,12 +47,21 @@ export interface QuotaRow {
 
 export function quotaRowsForProvider(provider: ProviderId, quota: Quota): QuotaRow[] {
   const rows: QuotaRow[] = [];
-  if (provider === "claude") {
-    rows.push({ label: "5H", window: quota.session, periodSeconds: FIVE_HOUR_SECONDS });
-    rows.push({ label: "7D", window: quota.weekly, periodSeconds: SEVEN_DAY_SECONDS });
-  } else {
+  if (provider === "codex") {
+    // Codex reports only the windows its plan actually has.
     if (quota.session) { rows.push({ label: "5H", window: quota.session, periodSeconds: FIVE_HOUR_SECONDS }); }
     if (quota.weekly) { rows.push({ label: "7D", window: quota.weekly, periodSeconds: SEVEN_DAY_SECONDS }); }
+  } else {
+    rows.push({ label: "5H", window: quota.session, periodSeconds: FIVE_HOUR_SECONDS });
+    rows.push({ label: "7D", window: quota.weekly, periodSeconds: SEVEN_DAY_SECONDS });
+    if (provider === "opencode") {
+      const resetsAt = quota.monthly?.resetsAt ?? null;
+      rows.push({
+        label: "1M",
+        window: quota.monthly,
+        periodSeconds: resetsAt === null ? MONTH_FALLBACK_SECONDS : monthlyPeriodSeconds(resetsAt),
+      });
+    }
   }
   for (const entry of quota.weeklyModels ?? []) {
     rows.push({ label: entry.model.slice(0, 2).toUpperCase(), window: entry.window, periodSeconds: SEVEN_DAY_SECONDS });
@@ -51,18 +81,30 @@ export function diagnosticText(error: string): string {
 }
 
 export function sectionsForPayload(payload: PopoverPayload): PopoverSection[] {
-  const ids: ProviderId[] = payload.preferences.source === "both"
-    ? ["claude", "codex"]
-    : [payload.preferences.source];
-  return ids.map((provider) => ({
+  return payload.preferences.sources.map((provider) => ({
     provider,
-    name: provider === "claude" ? "Claude Code" : "Codex OpenAI",
+    name: PROVIDER_LABELS[provider],
     state: payload.snapshot[provider],
   }));
 }
 
+// One enabled source already owns the menu bar, so the choice is meaningless.
 export function showMenuBarSetting(preferences: Preferences): boolean {
-  return preferences.source === "both";
+  return preferences.sources.length > 1;
+}
+
+export function selectedMenuBarSource(preferences: Preferences): ProviderId {
+  return menuBarProvider(preferences.sources, preferences.menuBarSource);
+}
+
+/** Toggling the last enabled source off is refused; something must stay shown. */
+export function toggledSources(
+  sources: readonly ProviderId[],
+  provider: ProviderId,
+): ProviderId[] | null {
+  if (!sources.includes(provider)) { return normalizeProviderIds([...sources, provider]); }
+  if (sources.length === 1) { return null; }
+  return sources.filter((id) => id !== provider);
 }
 
 export function isQuotaRefreshInProgress(payload: PopoverPayload): boolean {

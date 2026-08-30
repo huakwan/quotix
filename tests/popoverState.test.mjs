@@ -1,18 +1,9 @@
+import { canActivateUpdateAction, diagnosticText, isQuotaRefreshInProgress, monthlyPeriodSeconds, quotaRowsForProvider, sectionsForPayload, selectedMenuBarSource, showMenuBarSetting, toggledSources, updatePresentation, } from "../out/src/ui/popover/popoverState.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
-  canActivateUpdateAction,
-  diagnosticText,
-  isQuotaRefreshInProgress,
-  quotaRowsForProvider,
-  sectionsForPayload,
-  showMenuBarSetting,
-  updatePresentation,
-} from "../out/src/ui/popover/popoverState.js";
-
 const missing = { enabled: false, loading: false, result: { ok: false, reason: "missing" }, lastGood: null };
-const quota = { updatedAt: 100, session: null, weekly: null, planDetected: false };
+const quota = { updatedAt: 100, session: null, weekly: null, monthly: null, planDetected: false };
 
 test("download accepts only mouse clicks while other update actions allow keyboard activation", () => {
   assert.equal(canActivateUpdateAction("download", 0), false);
@@ -22,38 +13,62 @@ test("download accepts only mouse clicks while other update actions allow keyboa
   assert.equal(canActivateUpdateAction("retry", 0), true);
 });
 
-function payload(source) {
+function payload(...sources) {
+  const enabled = (provider) => sources.includes(provider);
   return {
-    preferences: { source, menuBarSource: "claude", resetMode: "countdown" },
+    preferences: { sources, menuBarSource: "claude", resetMode: "countdown" },
     snapshot: {
-      claude: { enabled: true, loading: false, result: { ok: true, quota }, lastGood: quota },
-      codex: { ...missing, enabled: source !== "claude", result: { ok: false, reason: "missing", error: "no cli" } },
+      claude: { enabled: enabled("claude"), loading: false, result: { ok: true, quota }, lastGood: quota },
+      codex: {
+        ...missing,
+        enabled: enabled("codex"),
+        result: { ok: false, reason: "missing", error: "no cli" },
+      },
+      opencode: {
+        ...missing,
+        enabled: enabled("opencode"),
+        result: { ok: false, reason: "missing", error: "no key" },
+      },
     },
     nowSec: 120,
   };
 }
 
-test("both returns stable Claude then Codex sections", () => {
-  const sections = sectionsForPayload(payload("both"));
-  assert.deepEqual(sections.map((section) => section.provider), ["claude", "codex"]);
-  assert.equal(sections[0].name, "Claude Code");
-  assert.equal(sections[1].name, "Codex OpenAI");
+test("every source returns stable Claude, Codex, then OpenCode sections", () => {
+  const sections = sectionsForPayload(payload("claude", "codex", "opencode"));
+  assert.deepEqual(sections.map((section) => section.provider), ["claude", "codex", "opencode"]);
+  assert.deepEqual(sections.map((section) => section.name), ["Claude Code", "Codex OpenAI", "OpenCode Go"]);
   assert.equal(sections[1].state.result.error, "no cli");
+  assert.equal(sections[2].state.result.error, "no key");
 });
 
 test("single source returns only its section", () => {
   assert.deepEqual(sectionsForPayload(payload("claude")).map((s) => s.provider), ["claude"]);
   assert.deepEqual(sectionsForPayload(payload("codex")).map((s) => s.provider), ["codex"]);
+  assert.deepEqual(sectionsForPayload(payload("opencode")).map((s) => s.provider), ["opencode"]);
 });
 
-test("menu-bar setting is visible only for both", () => {
-  assert.equal(showMenuBarSetting(payload("both").preferences), true);
+test("menu-bar setting is visible only with more than one source", () => {
+  assert.equal(showMenuBarSetting(payload("claude", "codex", "opencode").preferences), true);
+  assert.equal(showMenuBarSetting(payload("claude", "codex").preferences), true);
   assert.equal(showMenuBarSetting(payload("claude").preferences), false);
   assert.equal(showMenuBarSetting(payload("codex").preferences), false);
 });
 
+test("menu-bar selection falls back when the stored source is disabled", () => {
+  assert.equal(selectedMenuBarSource(payload("claude", "codex").preferences), "claude");
+  assert.equal(selectedMenuBarSource(payload("codex", "opencode").preferences), "codex");
+});
+
+test("toggling adds in presentation order, removes, and refuses to empty the list", () => {
+  assert.deepEqual(toggledSources(["claude"], "codex"), ["claude", "codex"]);
+  assert.deepEqual(toggledSources(["opencode"], "claude"), ["claude", "opencode"]);
+  assert.deepEqual(toggledSources(["claude", "codex"], "claude"), ["codex"]);
+  assert.equal(toggledSources(["codex"], "codex"), null);
+});
+
 test("refresh progress follows only enabled source sections", () => {
-  const both = payload("both");
+  const both = payload("claude", "codex", "opencode");
   both.snapshot.codex.loading = true;
   assert.equal(isQuotaRefreshInProgress(both), true);
 
@@ -79,6 +94,57 @@ test("quota rows keep both Claude windows but filter missing Codex windows", () 
     quotaRowsForProvider("codex", weeklyOnly).map((row) => row.label),
     ["7D"],
   );
+});
+
+test("OpenCode Go always shows its three billing windows", () => {
+  const rows = quotaRowsForProvider("opencode", {
+    updatedAt: 100,
+    session: { usedPct: 5, resetsAt: 300 },
+    weekly: { usedPct: 6, resetsAt: 600 },
+    monthly: { usedPct: 3, resetsAt: 900 },
+    planDetected: true,
+  });
+  assert.deepEqual(rows.map((row) => row.label), ["5H", "7D", "1M"]);
+  assert.deepEqual(rows.map((row) => row.window?.resetsAt), [300, 600, 900]);
+  assert.equal(rows[2].periodSeconds, monthlyPeriodSeconds(900));
+});
+
+test("monthly period spans the real calendar month, not a fixed 30 days", () => {
+  const localNoon = (year, month, day) => new Date(year, month, day, 12, 0, 0).getTime() / 1000;
+  const days = (seconds) => Math.round(seconds / 86400);
+
+  // The live case: an August 30 reset followed by a September 30 reset is a
+  // 31-day window (August has 31 days); a fixed 30-day period under-reads it.
+  assert.equal(days(monthlyPeriodSeconds(localNoon(2026, 8, 30))), 31);
+  // Calendar-anchored inter-reset duration also covers short months: a March 30
+  // reset after a 28-day February is a 30-day window, and a March 29 anchor
+  // clamped into February's last day yields 29 days.
+  assert.equal(days(monthlyPeriodSeconds(localNoon(2025, 2, 30))), 30);
+  assert.equal(days(monthlyPeriodSeconds(localNoon(2025, 2, 29))), 29);
+});
+
+test("an absent OpenCode Go monthly window still renders its row", () => {
+  const rows = quotaRowsForProvider("opencode", {
+    updatedAt: 100,
+    session: null,
+    weekly: null,
+    monthly: null,
+    planDetected: false,
+  });
+  assert.deepEqual(rows.map((row) => row.label), ["5H", "7D", "1M"]);
+  assert.deepEqual(rows.map((row) => row.window), [null, null, null]);
+});
+
+test("Claude and Codex never inherit the monthly row", () => {
+  const windows = {
+    updatedAt: 100,
+    session: null,
+    weekly: null,
+    monthly: { usedPct: 3, resetsAt: 900 },
+    planDetected: false,
+  };
+  assert.deepEqual(quotaRowsForProvider("claude", windows).map((row) => row.label), ["5H", "7D"]);
+  assert.deepEqual(quotaRowsForProvider("codex", windows).map((row) => row.label), []);
 });
 
 test("active per-model weekly quotas append extra rows", () => {

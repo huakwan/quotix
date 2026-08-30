@@ -6,6 +6,7 @@ release/
 .superpowers/
 .worktrees/
 .pnpm-store/
+.opencodex/
 
 !CLAUDE.md
 !Makefile

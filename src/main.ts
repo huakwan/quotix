@@ -18,12 +18,14 @@ import { createCachedTokenProvider } from "./quota/claude/credentials";
 import { CodexAppServerClient, spawnCodexAppServer } from "./quota/codex/appServer";
 import { resolveCodexExecutable } from "./quota/codex/executable";
 import { CodexQuotaProvider } from "./quota/codex/provider";
+import { OpenCodeQuotaProvider } from "./quota/opencode/provider";
+import { createCachedKeyProvider } from "./quota/opencode/credentials";
 import { QuotaCoordinator } from "./quota/coordinator";
 import type { ProviderId, QuotaSnapshot } from "./quota/model";
 import { SourceRuntime } from "./quota/sourceRuntime";
 import { syncOpenAtLogin, updateOpenAtLogin } from "./loginItem";
 import {
-  asDisplaySource,
+  asSources,
   asMenuBarSource,
   asOpenAtLogin,
   asResetMode,
@@ -191,11 +193,11 @@ function registerIpc(): void {
       resizePopover(popover, height);
     }
   });
-  ipcMain.on("preferences:setSource", (_event, value: unknown) => {
-    const source = asDisplaySource(value);
-    if (!source) { return; }
-    preferences = { ...preferences, source };
-    coordinator?.setSource(source);
+  ipcMain.on("preferences:setSources", (_event, value: unknown) => {
+    const sources = asSources(value);
+    if (!sources) { return; }
+    preferences = { ...preferences, sources };
+    coordinator?.setSources(sources);
     persistPreferences();
   });
   ipcMain.on("preferences:setMenuBarSource", (_event, value: unknown) => {
@@ -262,7 +264,14 @@ app.whenReady().then(async () => {
       );
       return new SourceRuntime(new CodexQuotaProvider(client), createQuotaCache(userDataDir, "codex"));
     },
-  }, preferences.source);
+    opencode: () => new SourceRuntime(
+      new OpenCodeQuotaProvider({
+        keyProvider: createCachedKeyProvider(),
+        fetchImpl: fetch,
+      }),
+      createQuotaCache(userDataDir, "opencode"),
+    ),
+  }, preferences.sources);
   unsubscribeCoordinator = coordinator.subscribe(render);
 
   popover = createPopover();

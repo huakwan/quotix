@@ -12,12 +12,39 @@ export interface Quota {
   updatedAt: number;
   session: QuotaWindow | null;
   weekly: QuotaWindow | null;
+  /** Only providers with a billing period longer than a week report this. */
+  monthly: QuotaWindow | null;
   weeklyModels: WeeklyModelQuota[];
   planDetected: boolean;
 }
 
-export type ProviderId = "claude" | "codex";
-export type DisplaySource = ProviderId | "both";
+export type ProviderId = "claude" | "codex" | "opencode";
+
+/** Presentation order, and the set enabled by default. */
+export const PROVIDER_IDS: readonly ProviderId[] = ["claude", "codex", "opencode"];
+
+export function isProviderId(value: unknown): value is ProviderId {
+  return typeof value === "string" && (PROVIDER_IDS as readonly string[]).includes(value);
+}
+
+/**
+ * Normalizes a stored or IPC-supplied source list into presentation order with
+ * duplicates dropped. Returns null when nothing valid survives, so callers can
+ * fall back rather than end up with no source at all.
+ */
+export function normalizeProviderIds(value: unknown): ProviderId[] | null {
+  if (!Array.isArray(value)) { return null; }
+  const ids = PROVIDER_IDS.filter((id) => value.includes(id));
+  return ids.length > 0 ? [...ids] : null;
+}
+
+/** The menu bar can only show a source that is enabled. */
+export function menuBarProvider(
+  sources: readonly ProviderId[],
+  menuBarSource: ProviderId,
+): ProviderId {
+  return sources.includes(menuBarSource) ? menuBarSource : sources[0] ?? menuBarSource;
+}
 
 export type ReadResult =
   | { ok: true; quota: Quota; diagnostic?: string }
@@ -67,6 +94,7 @@ export function quotaFromOAuthUsage(usage: unknown, updatedAt: number): Quota {
     updatedAt,
     session,
     weekly,
+    monthly: null,
     weeklyModels: parseWeeklyModelLimits(o.limits),
     planDetected: session !== null || weekly !== null,
   };
@@ -118,7 +146,46 @@ export function quotaFromCodexRateLimits(response: unknown, updatedAt: number): 
   return {
     updatedAt,
     ...slots,
+    monthly: null,
     weeklyModels: [],
     planDetected: slots.session !== null || slots.weekly !== null,
+  };
+}
+
+function epochSeconds(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.floor(value > 1e11 ? value / 1000 : value);
+  }
+  if (typeof value !== "string") { return null; }
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : Math.floor(parsed / 1000);
+}
+
+function toOpenCodeWindow(value: unknown): QuotaWindow | null {
+  if (!value || typeof value !== "object") { return null; }
+  const window = value as Record<string, unknown>;
+  if (typeof window.percent !== "number" || !Number.isFinite(window.percent)) { return null; }
+  return { usedPct: window.percent, resetsAt: epochSeconds(window.resetsAt) };
+}
+
+// OpenCode Go bills in dollars and exposes three windows: a rolling 5-hour
+// window, a weekly window, and a monthly one. Windows an account does not have
+// are absent from the payload, so the matching slot stays null rather than
+// rendering as an unused 0% bar.
+export function quotaFromOpenCodeUsage(payload: unknown, updatedAt: number): Quota {
+  const root = payload && typeof payload === "object" ? payload as Record<string, unknown> : {};
+  const usage = root.usage && typeof root.usage === "object"
+    ? root.usage as Record<string, unknown>
+    : root;
+  const session = toOpenCodeWindow(usage.rolling);
+  const weekly = toOpenCodeWindow(usage.weekly);
+  const monthly = toOpenCodeWindow(usage.monthly);
+  return {
+    updatedAt,
+    session,
+    weekly,
+    monthly,
+    weeklyModels: [],
+    planDetected: session !== null || weekly !== null || monthly !== null,
   };
 }

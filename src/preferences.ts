@@ -1,11 +1,12 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { DisplaySource, ProviderId } from "./quota/model";
+import type { ProviderId } from "./quota/model";
+import { PROVIDER_IDS, isProviderId, menuBarProvider, normalizeProviderIds } from "./quota/model";
 
 export type ResetMode = "countdown" | "clock";
 
 export interface Preferences {
-  source: DisplaySource;
+  sources: ProviderId[];
   menuBarSource: ProviderId;
   resetMode: ResetMode;
   showPaceLine: boolean;
@@ -13,7 +14,7 @@ export interface Preferences {
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
-  source: "both",
+  sources: [...PROVIDER_IDS],
   menuBarSource: "claude",
   resetMode: "countdown",
   showPaceLine: true,
@@ -30,17 +31,26 @@ function pathFor(userDataDir: string): string {
   return join(userDataDir, "quotix-preferences.json");
 }
 
+// Settings written before multi-select stored a single `source`, where "both"
+// meant every provider. Keep reading it so an upgrade does not reset the choice.
+function readSources(value: Record<string, unknown>): ProviderId[] {
+  const sources = normalizeProviderIds(value.sources);
+  if (sources) { return sources; }
+  if (value.source === "both") { return [...PROVIDER_IDS]; }
+  if (isProviderId(value.source)) { return [value.source]; }
+  return [...DEFAULT_PREFERENCES.sources];
+}
+
 export function effectiveMenuBarSource(preferences: Preferences): ProviderId {
-  return preferences.source === "both" ? preferences.menuBarSource : preferences.source;
+  return menuBarProvider(preferences.sources, preferences.menuBarSource);
 }
 
 export function loadPreferences(userDataDir: string, deps: ReadDeps = defaultReadDeps): Preferences {
   try {
     const value = JSON.parse(deps.readFile(pathFor(userDataDir))) as Record<string, unknown>;
     return {
-      source: value.source === "claude" || value.source === "codex" || value.source === "both"
-        ? value.source : DEFAULT_PREFERENCES.source,
-      menuBarSource: value.menuBarSource === "claude" || value.menuBarSource === "codex"
+      sources: readSources(value),
+      menuBarSource: isProviderId(value.menuBarSource)
         ? value.menuBarSource : DEFAULT_PREFERENCES.menuBarSource,
       resetMode: value.resetMode === "clock" || value.resetMode === "countdown"
         ? value.resetMode : DEFAULT_PREFERENCES.resetMode,
@@ -50,7 +60,7 @@ export function loadPreferences(userDataDir: string, deps: ReadDeps = defaultRea
         ? value.openAtLogin : DEFAULT_PREFERENCES.openAtLogin,
     };
   } catch {
-    return { ...DEFAULT_PREFERENCES };
+    return { ...DEFAULT_PREFERENCES, sources: [...DEFAULT_PREFERENCES.sources] };
   }
 }
 

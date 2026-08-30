@@ -1,4 +1,4 @@
-import type { DisplaySource, ProviderId, QuotaSnapshot, SourceState } from "./model";
+import type { ProviderId, QuotaSnapshot, SourceState } from "./model";
 import type { SourceRuntime } from "./sourceRuntime";
 
 type RuntimeFactory = () => SourceRuntime;
@@ -11,21 +11,17 @@ const disabledState = (): SourceState => ({
   lastGood: null,
 });
 
-function enabledIds(source: DisplaySource): ProviderId[] {
-  return source === "both" ? ["claude", "codex"] : [source];
-}
-
 export class QuotaCoordinator {
   private runtimes = new Map<ProviderId, SourceRuntime>();
   private unsubscribers = new Map<ProviderId, () => void>();
   private listeners = new Set<(snapshot: QuotaSnapshot) => void>();
 
-  constructor(private readonly factories: RuntimeFactories, source: DisplaySource) {
-    for (const id of enabledIds(source)) { this.enable(id, false); }
+  constructor(private readonly factories: RuntimeFactories, sources: readonly ProviderId[]) {
+    for (const id of sources) { this.enable(id, false); }
   }
 
-  setSource(source: DisplaySource): void {
-    const wanted = new Set(enabledIds(source));
+  setSources(sources: readonly ProviderId[]): void {
+    const wanted = new Set(sources);
     for (const [id, runtime] of this.runtimes) {
       if (wanted.has(id)) { continue; }
       this.unsubscribers.get(id)?.();
@@ -45,8 +41,9 @@ export class QuotaCoordinator {
 
   snapshot(): QuotaSnapshot {
     return {
-      claude: this.runtimes.get("claude")?.state() ?? disabledState(),
-      codex: this.runtimes.get("codex")?.state() ?? disabledState(),
+      claude: this.stateOf("claude"),
+      codex: this.stateOf("codex"),
+      opencode: this.stateOf("opencode"),
     };
   }
 
@@ -61,6 +58,10 @@ export class QuotaCoordinator {
     this.unsubscribers.clear();
     this.runtimes.clear();
     this.listeners.clear();
+  }
+
+  private stateOf(id: ProviderId): SourceState {
+    return this.runtimes.get(id)?.state() ?? disabledState();
   }
 
   private enable(id: ProviderId, poll: boolean): void {

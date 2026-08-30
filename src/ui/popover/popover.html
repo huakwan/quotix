@@ -37,12 +37,13 @@
         }
       }
 
-      .codex-logo {
+      /* Single-colour provider marks are authored for light mode. */
+      .monochrome-logo {
         filter: invert(1);
       }
 
       @media (prefers-color-scheme: light) {
-        .codex-logo {
+        .monochrome-logo {
           filter: none;
         }
       }
@@ -247,6 +248,12 @@
           0 1px 2px var(--selected-shadow),
           0 0 0 0.5px var(--selected-border);
       }
+      /* The provider rows carry one button per source, so they give up horizontal
+         padding and a touch of tracking to stay inside the fixed popover width. */
+      .segmented.provider-modes .seg-btn {
+        padding: 3px 7px;
+        letter-spacing: 0;
+      }
       .seg-btn:focus {
         outline: none;
       }
@@ -379,26 +386,29 @@
       <div class="settings">
         <div class="setting-row">
           <span class="s-label">Source</span>
-          <div class="segmented" id="source-mode">
+          <div class="segmented provider-modes" id="source-mode">
             <button class="seg-btn" data-value="claude" tabindex="-1">
               Claude
             </button>
             <button class="seg-btn" data-value="codex" tabindex="-1">
               Codex
             </button>
-            <button class="seg-btn" data-value="both" tabindex="-1">
-              Both
+            <button class="seg-btn" data-value="opencode" tabindex="-1">
+              OpenCode
             </button>
           </div>
         </div>
         <div class="setting-row" id="menu-source-row">
           <span class="s-label">Menu bar</span>
-          <div class="segmented" id="menu-source">
+          <div class="segmented provider-modes" id="menu-source">
             <button class="seg-btn" data-value="claude" tabindex="-1">
               Claude
             </button>
             <button class="seg-btn" data-value="codex" tabindex="-1">
               Codex
+            </button>
+            <button class="seg-btn" data-value="opencode" tabindex="-1">
+              OpenCode
             </button>
           </div>
         </div>
@@ -460,11 +470,7 @@
             title="About Quotix"
             tabindex="-1"
           >
-            <svg
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              aria-hidden="true"
-            >
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path
                 d="M17.726 13.02L14 16H9v-1h4.065a.5.5 0 0 0 .416-.777l-.888-1.332A2 2 0 0 0 10.93 12H3a1 1 0 0 0-1 1v6a2 2 0 0 0 2 2h9.639a3 3 0 0 0 2.258-1.024L22 13l-1.452-.484a3 3 0 0 0-2.822.504m1.532-5.63c.451-.465.73-1.108.73-1.818s-.279-1.353-.73-1.818A2.45 2.45 0 0 0 17.494 3S16.25 2.997 15 4.286C13.75 2.997 12.506 3 12.506 3a2.45 2.45 0 0 0-1.764.753c-.451.466-.73 1.108-.73 1.818s.279 1.354.73 1.818L15 12z"
               />
