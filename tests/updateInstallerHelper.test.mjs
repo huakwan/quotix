@@ -2,16 +2,15 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { chmod, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
-import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
 import { packAsar } from "./helpers/asar.mjs";
+import { runnableElectron } from "./helpers/electron.mjs";
 
 const execFileAsync = promisify(execFile);
-const require = createRequire(import.meta.url);
 
 async function exists(path) {
   try {
@@ -263,17 +262,8 @@ sleep 20
 }
 
 test("installer helper leaves no backup or staging behind under Electron", async (t) => {
-  let electronPath;
-  try {
-    electronPath = require("electron");
-  } catch {
-    t.skip("electron is not installed");
-    return;
-  }
-  if (typeof electronPath !== "string" || !existsSync(electronPath)) {
-    t.skip("electron binary is unavailable");
-    return;
-  }
+  const electronPath = await runnableElectron(t);
+  if (!electronPath) return;
 
   const root = await mkdtemp(join(tmpdir(), "quotix-helper-electron-"));
   const applications = join(root, "Applications");

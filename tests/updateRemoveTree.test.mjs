@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
-import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
@@ -10,9 +9,9 @@ import { promisify } from "node:util";
 
 import { removeTree } from "../out/src/update/removeTree.js";
 import { packAsar } from "./helpers/asar.mjs";
+import { runnableElectron } from "./helpers/electron.mjs";
 
 const execFileAsync = promisify(execFile);
-const require = createRequire(import.meta.url);
 
 async function appBundle(root) {
   const bundle = join(root, "Quotix.app");
@@ -36,29 +35,8 @@ test("removeTree deletes a nested tree and ignores a missing path", async () => 
 });
 
 test("removeTree deletes an app bundle that Electron's asar fs cannot", async (t) => {
-  let electronPath;
-  try {
-    electronPath = require("electron");
-  } catch {
-    t.skip("electron is not installed");
-    return;
-  }
-  if (typeof electronPath !== "string" || !existsSync(electronPath)) {
-    t.skip("electron binary is unavailable");
-    return;
-  }
-
-  // A truncated or unsigned Electron download cannot launch at all. That is an
-  // install problem the packaging job already catches, not a removeTree regression.
-  try {
-    await execFileAsync(electronPath, ["-e", "process.stdout.write('ok')"], {
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
-      encoding: "utf8",
-    });
-  } catch (error) {
-    t.skip(`electron binary cannot run: ${error.stderr || error.message}`);
-    return;
-  }
+  const electronPath = await runnableElectron(t);
+  if (!electronPath) return;
 
   const root = await mkdtemp(join(tmpdir(), "quotix-removetree-asar-"));
   const bundle = await appBundle(root);
