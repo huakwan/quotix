@@ -48,6 +48,18 @@ test("removeTree deletes an app bundle that Electron's asar fs cannot", async (t
     return;
   }
 
+  // A truncated or unsigned Electron download cannot launch at all. That is an
+  // install problem the packaging job already catches, not a removeTree regression.
+  try {
+    await execFileAsync(electronPath, ["-e", "process.stdout.write('ok')"], {
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+      encoding: "utf8",
+    });
+  } catch (error) {
+    t.skip(`electron binary cannot run: ${error.stderr || error.message}`);
+    return;
+  }
+
   const root = await mkdtemp(join(tmpdir(), "quotix-removetree-asar-"));
   const bundle = await appBundle(root);
   const modulePath = resolve(dirname(new URL(import.meta.url).pathname), "../out/src/update/removeTree.js");
