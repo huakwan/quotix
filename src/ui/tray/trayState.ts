@@ -15,7 +15,7 @@ export function trayWindowVisibility(display: TrayDisplayState): {
   session: boolean;
   weekly: boolean;
 } {
-  if (display.provider === "claude") {
+  if (display.provider === "claude" || display.provider === "google") {
     return { session: true, weekly: true };
   }
   return { session: display.session !== null, weekly: display.weekly !== null };

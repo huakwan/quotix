@@ -118,6 +118,9 @@ function unavailableMessage(provider: ProviderId, state: SourceState): string {
   if (provider === "opencode" && !state.result.ok && state.result.reason === "missing") {
     return "No OpenCode Go key was found. Add it with opencode auth login.";
   }
+  if (provider === "google" && !state.result.ok && state.result.reason === "missing") {
+    return "No Google AI credentials found. Sign in with the Antigravity CLI or IDE.";
+  }
   return "Quota data unavailable. Retrying automatically…";
 }
 
@@ -182,7 +185,7 @@ function syncButtons(containerId: string, value: string): void {
 // The source row is a multi-select, and the menu-bar row only offers what the
 // source row enabled, so both are driven off the enabled set rather than one value.
 function syncSourceButtons(sources: readonly ProviderId[], menuBarSource: ProviderId): void {
-  for (const button of document.querySelectorAll<HTMLButtonElement>("#source-mode .seg-btn")) {
+  for (const button of document.querySelectorAll<HTMLButtonElement>("#source-mode .chip-btn, #source-mode .seg-btn")) {
     button.classList.toggle("active", sources.includes(button.dataset.value as ProviderId));
   }
   for (const button of document.querySelectorAll<HTMLButtonElement>("#menu-source .seg-btn")) {
@@ -229,7 +232,7 @@ function draw(): void {
 
 function onSegment(id: string, callback: (value: string) => void): void {
   document.getElementById(id)!.addEventListener("click", (event) => {
-    const button = (event.target as HTMLElement).closest<HTMLButtonElement>(".seg-btn");
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>(".seg-btn, .chip-btn");
     if (button?.dataset.value) { callback(button.dataset.value); }
   });
 }

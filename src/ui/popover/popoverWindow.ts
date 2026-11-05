@@ -1,7 +1,7 @@
 import { BrowserWindow, screen } from "electron";
 import { join } from "node:path";
 
-const WIDTH = 272;
+const WIDTH = 280;
 const HEIGHT = 140; // initial guess; resizePopover() fits to content after first render
 
 let lastHiddenAt = 0;
@@ -36,7 +36,10 @@ export function createPopover(): BrowserWindow {
 // The renderer reports its panel height via the "popover:resize" IPC channel.
 export function resizePopover(win: BrowserWindow, contentHeight: number): void {
   if (win.isDestroyed()) { return; }
-  const h = Math.max(1, Math.round(contentHeight));
+  const [x, y] = win.getPosition();
+  const display = screen.getDisplayNearestPoint({ x, y });
+  const maxHeight = Math.max(200, display.workArea.y + display.workArea.height - y - 16);
+  const h = Math.max(1, Math.min(maxHeight, Math.round(contentHeight)));
   const [, current] = win.getContentSize();
   if (h !== current) { win.setContentSize(WIDTH, h); }
 }

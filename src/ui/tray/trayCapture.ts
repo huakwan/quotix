@@ -3,6 +3,7 @@ import { logoNeedsInverting } from "../branding";
 import anthropicIcon from "../../../assets/anthropic.svg";
 import openaiIcon from "../../../assets/openai.svg";
 import opencodeIcon from "../../../assets/opencode.svg";
+import googleIcon from "../../../assets/google.svg";
 import pageTemplate from "./trayCapture.html";
 import { BrowserWindow, NativeImage, nativeImage } from "electron";
 
@@ -19,6 +20,7 @@ const PAGE = pageTemplate
   .replaceAll("__ICON_CLAUDE__", anthropicIcon)
   .replaceAll("__ICON_CODEX__", openaiIcon)
   .replaceAll("__ICON_OPENCODE__", opencodeIcon)
+  .replaceAll("__ICON_GOOGLE__", googleIcon)
   .replaceAll("__SESSION_DUR__", String(5 * 3600))
   .replaceAll("__WEEKLY_DUR__", String(7 * 24 * 3600));
 

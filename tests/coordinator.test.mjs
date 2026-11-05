@@ -23,6 +23,7 @@ function factories(events) {
     claude: () => fakeRuntime("claude", events),
     codex: () => fakeRuntime("codex", events),
     opencode: () => fakeRuntime("opencode", events),
+    google: () => fakeRuntime("google", events),
   };
 }
 

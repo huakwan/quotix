@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { ProviderId, Quota, QuotaWindow, WeeklyModelQuota } from "./model";
+import type { ProviderId, Quota, QuotaRow, QuotaWindow, WeeklyModelQuota } from "./model";
 
 export interface QuotaCache {
   readonly path: string;
@@ -40,9 +40,26 @@ function normWeeklyModels(value: unknown): WeeklyModelQuota[] {
   });
 }
 
+function normExtraRows(value: unknown): QuotaRow[] | undefined {
+  if (value === undefined || value === null) { return undefined; }
+  if (!Array.isArray(value)) { throw new Error("invalid extra rows"); }
+  return value.map((entry) => {
+    if (!entry || typeof entry !== "object") { throw new Error("invalid extra row entry"); }
+    const e = entry as Record<string, unknown>;
+    if (typeof e.label !== "string") { throw new Error("invalid extra row label"); }
+    if (typeof e.periodSeconds !== "number") { throw new Error("invalid extra row period"); }
+    return {
+      label: e.label,
+      window: normWindow(e.window),
+      periodSeconds: e.periodSeconds,
+    };
+  });
+}
+
 function parseQuota(raw: string): Quota {
   const value = JSON.parse(raw) as Record<string, unknown>;
   if (typeof value.updatedAt !== "number") { throw new Error("invalid timestamp"); }
+  const extraRows = normExtraRows(value.extraRows);
   return {
     updatedAt: value.updatedAt,
     session: normWindow(value.session),
@@ -50,6 +67,7 @@ function parseQuota(raw: string): Quota {
     // Caches written before OpenCode Go only carry two windows.
     monthly: value.monthly === undefined ? null : normWindow(value.monthly),
     weeklyModels: normWeeklyModels(value.weeklyModels),
+    ...(extraRows !== undefined ? { extraRows } : {}),
     planDetected: value.planDetected === true,
   };
 }

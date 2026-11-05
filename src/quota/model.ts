@@ -8,6 +8,12 @@ export interface WeeklyModelQuota {
   window: QuotaWindow | null;
 }
 
+export interface QuotaRow {
+  label: string;
+  window: QuotaWindow | null;
+  periodSeconds: number;
+}
+
 export interface Quota {
   updatedAt: number;
   session: QuotaWindow | null;
@@ -16,12 +22,13 @@ export interface Quota {
   monthly: QuotaWindow | null;
   weeklyModels: WeeklyModelQuota[];
   planDetected: boolean;
+  extraRows?: QuotaRow[];
 }
 
-export type ProviderId = "claude" | "codex" | "opencode";
+export type ProviderId = "claude" | "codex" | "opencode" | "google";
 
 /** Presentation order, and the set enabled by default. */
-export const PROVIDER_IDS: readonly ProviderId[] = ["claude", "codex", "opencode"];
+export const PROVIDER_IDS: readonly ProviderId[] = ["claude", "codex", "opencode", "google"];
 
 export function isProviderId(value: unknown): value is ProviderId {
   return typeof value === "string" && (PROVIDER_IDS as readonly string[]).includes(value);
@@ -187,5 +194,90 @@ export function quotaFromOpenCodeUsage(payload: unknown, updatedAt: number): Quo
     monthly,
     weeklyModels: [],
     planDetected: session !== null || weekly !== null || monthly !== null,
+  };
+}
+
+const FIVE_HOUR_SECONDS = 5 * 3600;
+const SEVEN_DAY_SECONDS = 7 * 24 * 3600;
+const GOOGLE_ROW_ORDER: readonly string[] = ["5H", "7D", "C 5H", "C 7D", "ARGON"];
+
+export function quotaFromGoogleQuotaSummary(payload: unknown, updatedAt: number): Quota {
+  const root = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
+  const response = (root.response && typeof root.response === "object" ? root.response : root) as Record<string, unknown>;
+  const groups = Array.isArray(response.groups) ? response.groups : [];
+
+  let session: QuotaWindow | null = null;
+  let weekly: QuotaWindow | null = null;
+  const extraRows: QuotaRow[] = [];
+
+  for (const group of groups) {
+    if (!group || typeof group !== "object") { continue; }
+    const g = group as Record<string, unknown>;
+    const groupName = typeof g.displayName === "string" ? g.displayName.trim() : "";
+    const buckets = Array.isArray(g.buckets) ? g.buckets : [];
+
+    for (const bucket of buckets) {
+      if (!bucket || typeof bucket !== "object") { continue; }
+      const b = bucket as Record<string, unknown>;
+      const bucketId = typeof b.bucketId === "string" ? b.bucketId : "";
+      const windowStr = typeof b.window === "string" ? b.window.toLowerCase() : "";
+      const remainingFraction = typeof b.remainingFraction === "number" && Number.isFinite(b.remainingFraction)
+        ? Math.max(0, Math.min(1, b.remainingFraction))
+        : 1;
+      const usedPct = Math.round((1 - remainingFraction) * 10000) / 100;
+      const resetsAt = epochSeconds(b.resetTime);
+      const window: QuotaWindow = { usedPct, resetsAt };
+
+      const isFiveHour = windowStr === "5h" || bucketId.includes("5h");
+      const periodSeconds = isFiveHour ? FIVE_HOUR_SECONDS : SEVEN_DAY_SECONDS;
+
+      let label: string;
+      const lowerGroup = groupName.toLowerCase();
+      const lowerBucket = bucketId.toLowerCase();
+
+      if (lowerGroup.includes("argon") || lowerBucket.includes("argon")) {
+        label = "ARGON";
+      } else if (lowerGroup.includes("claude") || lowerGroup.includes("gpt") || lowerBucket.includes("3p")) {
+        label = isFiveHour ? "C 5H" : "C 7D";
+      } else {
+        label = isFiveHour ? "5H" : "7D";
+        if (isFiveHour && session === null) {
+          session = window;
+        } else if (!isFiveHour && weekly === null) {
+          weekly = window;
+        }
+      }
+
+      extraRows.push({ label, window, periodSeconds });
+    }
+  }
+
+  // Sort rows in a consistent presentation order
+  extraRows.sort((a, b) => {
+    const ai = GOOGLE_ROW_ORDER.indexOf(a.label);
+    const bi = GOOGLE_ROW_ORDER.indexOf(b.label);
+    if (ai !== -1 && bi !== -1) { return ai - bi; }
+    if (ai !== -1) { return -1; }
+    if (bi !== -1) { return 1; }
+    return a.label.localeCompare(b.label);
+  });
+
+  if (session === null && extraRows.length > 0) {
+    const first5h = extraRows.find((r) => r.periodSeconds === FIVE_HOUR_SECONDS);
+    if (first5h) { session = first5h.window; }
+  }
+  if (weekly === null && extraRows.length > 0) {
+    const first7d = extraRows.find((r) => r.periodSeconds === SEVEN_DAY_SECONDS);
+    if (first7d) { weekly = first7d.window; }
+  }
+
+  return {
+    updatedAt,
+    session,
+    weekly,
+    monthly: null,
+    weeklyModels: [],
+    extraRows,
+    planDetected: session !== null || weekly !== null || extraRows.length > 0,
   };
 }

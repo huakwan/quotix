@@ -29,6 +29,11 @@ function payload(...sources) {
         enabled: enabled("opencode"),
         result: { ok: false, reason: "missing", error: "no key" },
       },
+      google: {
+        ...missing,
+        enabled: enabled("google"),
+        result: { ok: false, reason: "missing", error: "no creds" },
+      },
     },
     nowSec: 120,
   };
@@ -133,6 +138,26 @@ test("an absent OpenCode Go monthly window still renders its row", () => {
   });
   assert.deepEqual(rows.map((row) => row.label), ["5H", "7D", "1M"]);
   assert.deepEqual(rows.map((row) => row.window), [null, null, null]);
+});
+
+test("Google AI Pro renders extraRows for multi-model quotas", () => {
+  const rows = quotaRowsForProvider("google", {
+    updatedAt: 100,
+    session: { usedPct: 10, resetsAt: 200 },
+    weekly: { usedPct: 20, resetsAt: 300 },
+    monthly: null,
+    weeklyModels: [],
+    extraRows: [
+      { label: "5H", window: { usedPct: 10, resetsAt: 200 }, periodSeconds: 18000 },
+      { label: "7D", window: { usedPct: 20, resetsAt: 300 }, periodSeconds: 604800 },
+      { label: "C 5H", window: { usedPct: 0, resetsAt: 400 }, periodSeconds: 18000 },
+      { label: "C 7D", window: { usedPct: 0, resetsAt: 500 }, periodSeconds: 604800 },
+      { label: "ARGON", window: { usedPct: 27, resetsAt: 600 }, periodSeconds: 604800 },
+    ],
+    planDetected: true,
+  });
+  assert.deepEqual(rows.map((r) => r.label), ["5H", "7D", "C 5H", "C 7D", "ARGON"]);
+  assert.equal(rows[4].window.usedPct, 27);
 });
 
 test("Claude and Codex never inherit the monthly row", () => {

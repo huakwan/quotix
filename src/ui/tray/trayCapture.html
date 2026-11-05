@@ -139,6 +139,7 @@
         claude: "data:image/svg+xml;base64,__ICON_CLAUDE__",
         codex: "data:image/svg+xml;base64,__ICON_CODEX__",
         opencode: "data:image/svg+xml;base64,__ICON_OPENCODE__",
+        google: "data:image/svg+xml;base64,__ICON_GOOGLE__",
       };
       window.__render = function (
         provider,
@@ -214,13 +215,15 @@
         claude: new Image(),
         codex: new Image(),
         opencode: new Image(),
+        google: new Image(),
       };
       canvasLogos.claude.src = logos.claude;
       canvasLogos.codex.src = logos.codex;
       canvasLogos.opencode.src = logos.opencode;
+      canvasLogos.google.src = logos.google;
 
       async function readyImage(image) {
-        if (image.complete) return;
+        if (!image || image.complete) return;
         try {
           await Promise.race([
             image.decode(),
@@ -285,7 +288,7 @@
 
           var foreground = dark ? "#f2f2f2" : "#1c1c1e";
           var logo = canvasLogos[provider];
-          if (logo.complete && logo.naturalWidth > 0) {
+          if (logo && logo.complete && logo.naturalWidth > 0) {
             ctx.save();
             ctx.filter = invertLogo && dark ? "invert(1)" : "none";
             ctx.drawImage(logo, 3, (__H__ - 15) / 2, 15, 15);

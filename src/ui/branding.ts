@@ -5,6 +5,7 @@ export const PROVIDER_LABELS: Record<ProviderId, string> = {
   claude: "Claude Code",
   codex: "Codex OpenAI",
   opencode: "OpenCode Go",
+  google: "Google AI Pro",
 };
 
 /**
@@ -15,6 +16,7 @@ export const PROVIDER_LOGOS: Record<ProviderId, string> = {
   claude: "../assets/anthropic.svg",
   codex: "../assets/openai.svg",
   opencode: "../assets/opencode.svg",
+  google: "../assets/google.svg",
 };
 
 /**
@@ -23,5 +25,5 @@ export const PROVIDER_LOGOS: Record<ProviderId, string> = {
  * system is in dark mode.
  */
 export function logoNeedsInverting(provider: ProviderId): boolean {
-  return provider === "codex" || provider === "opencode";
+  return provider === "codex" || provider === "opencode" || provider === "google";
 }

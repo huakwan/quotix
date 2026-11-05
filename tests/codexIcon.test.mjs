@@ -18,6 +18,11 @@ test("OpenCode mark is canonical black", () => {
   assert.match(svg, /fill="(?:#000000|#000|black)"/i);
 });
 
+test("Google mark is canonical black", () => {
+  const svg = readFileSync(join(root, "assets/google.svg"), "utf8");
+  assert.match(svg, /fill="(?:#000000|#000|black)"/i);
+});
+
 test("popover adapts every monochrome mark to the active appearance", () => {
   const renderer = readFileSync(join(root, "src/ui/popover/popoverRenderer.ts"), "utf8");
   const html = readFileSync(join(root, "src/ui/popover/popover.html"), "utf8");
@@ -49,8 +54,11 @@ test("tray receives the invert decision instead of hardcoding a provider", () =>
 
   assert.match(source, /const invertLogo = logoNeedsInverting\(display\.provider\)/);
   assert.match(source, /__ICON_OPENCODE__/);
+  assert.match(source, /__ICON_GOOGLE__/);
   assert.match(tray, /opencode: "data:image\/svg\+xml;base64,__ICON_OPENCODE__"/);
+  assert.match(tray, /google: "data:image\/svg\+xml;base64,__ICON_GOOGLE__"/);
   assert.match(tray, /canvasLogos\.opencode\.src = logos\.opencode/);
+  assert.match(tray, /canvasLogos\.google\.src = logos\.google/);
 });
 
 test("tray provides explicit 1x and 2x canvas image representations", () => {

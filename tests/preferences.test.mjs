@@ -10,7 +10,7 @@ import {
 
 test("preferences default to every source with Claude in the menu bar", () => {
   assert.deepEqual(loadPreferences("/data", { readFile: () => { throw new Error("missing"); } }), {
-    sources: ["claude", "codex", "opencode"],
+    sources: ["claude", "codex", "opencode", "google"],
     menuBarSource: "claude",
     resetMode: "countdown",
     showPaceLine: true,
@@ -36,15 +36,15 @@ test("a legacy single source migrates to a one-entry list", () => {
 
 test("the legacy both value migrates to every source", () => {
   const prefs = loadPreferences("/data", { readFile: () => JSON.stringify({ source: "both" }) });
-  assert.deepEqual(prefs.sources, ["claude", "codex", "opencode"]);
+  assert.deepEqual(prefs.sources, ["claude", "codex", "opencode", "google"]);
 });
 
 test("invalid preference fields fall back independently", () => {
   const prefs = loadPreferences("/data", {
-    readFile: () => JSON.stringify({ sources: ["gemini"], menuBarSource: "codex", resetMode: "clock" }),
+    readFile: () => JSON.stringify({ sources: ["unknown"], menuBarSource: "codex", resetMode: "clock" }),
   });
   assert.deepEqual(prefs, {
-    sources: ["claude", "codex", "opencode"],
+    sources: ["claude", "codex", "opencode", "google"],
     menuBarSource: "codex",
     resetMode: "clock",
     showPaceLine: true,

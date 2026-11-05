@@ -19,6 +19,8 @@ import { resolveCodexExecutable } from "./quota/codex/executable";
 import { CodexQuotaProvider } from "./quota/codex/provider";
 import { OpenCodeQuotaProvider } from "./quota/opencode/provider";
 import { createCachedKeyProvider } from "./quota/opencode/credentials";
+import { GoogleQuotaProvider } from "./quota/google/provider";
+import { createCachedGoogleKeyProvider } from "./quota/google/credentials";
 import { QuotaCoordinator } from "./quota/coordinator";
 import type { ProviderId, QuotaSnapshot } from "./quota/model";
 import { SourceRuntime } from "./quota/sourceRuntime";
@@ -277,6 +279,13 @@ app.whenReady().then(async () => {
         fetchImpl: fetch,
       }),
       createQuotaCache(userDataDir, "opencode"),
+    ),
+    google: () => new SourceRuntime(
+      new GoogleQuotaProvider({
+        keyProvider: createCachedGoogleKeyProvider(),
+        fetchImpl: fetch,
+      }),
+      createQuotaCache(userDataDir, "google"),
     ),
   }, preferences.sources);
   unsubscribeCoordinator = coordinator.subscribe(render);

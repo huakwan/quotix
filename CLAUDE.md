@@ -20,7 +20,7 @@ to `out/` before tests import them.
 Quotix is a macOS-only Electron menu bar app. `src/main.ts` is the composition
 root and all quota data flows through a provider framework:
 
-1. `src/quota/provider.ts` — common Claude/Codex/OpenCode adapter contract.
+1. `src/quota/provider.ts` — common Claude/Codex/OpenCode/Google adapter contract.
 2. `src/quota/sourceRuntime.ts` — per-source cache, loading, in-flight,
    consecutive rate-limit, and backoff state.
 3. `src/quota/coordinator.ts` — source lifecycle and concurrent polling.
@@ -41,7 +41,14 @@ root and all quota data flows through a provider framework:
    onto the shared `session`, `weekly`, and `monthly` quota windows. Prefer the
    `opencode-go` entry and fall back to `opencode`, because a Zen key reads the
    same account. Each credential failure reason gets its own message.
-7. `src/preferences.ts` — validated JSON settings under Electron user data.
+7. `src/quota/google/` — Antigravity local daemon hub discovery
+   (`~/.gemini/antigravity/daemon/hub_*.json`) and Google Cloud Code PA endpoint
+   (`https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary`)
+   adapter with macOS Keychain credential fallback (`gemini` / `antigravity`).
+   Observes credentials without modifying them. Maps `Gemini Models` (5-hour &
+   weekly), `Claude and GPT models` (5-hour & weekly), and `Gemini 4 Argon` (weekly)
+   quota windows into popover extraRows and primary menu bar tray windows.
+8. `src/preferences.ts` — validated JSON settings under Electron user data.
    `sources` is a multi-select list of `ProviderId` kept in `PROVIDER_IDS` order and
    never empty; legacy single-`source` settings (including `"both"`) still migrate on
    read. The menu-bar source falls back to the first enabled source and its picker is
@@ -50,7 +57,7 @@ root and all quota data flows through a provider framework:
    and some machines render the menu bar the other way.
    Adding a source should only mean a new id in `PROVIDER_IDS` plus a runtime
    factory, a logo, and a button in the popover rows.
-8. `src/ui/` — pure tray/popover selectors plus Electron/DOM renderers.
+9. `src/ui/` — pure tray/popover selectors plus Electron/DOM renderers.
    `src/ui/branding.ts` maps a provider to its label, its asset, and whether its
    mark is a black glyph that needs inverting in dark mode.
 

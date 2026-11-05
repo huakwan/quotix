@@ -44,6 +44,7 @@ export class QuotaCoordinator {
       claude: this.stateOf("claude"),
       codex: this.stateOf("codex"),
       opencode: this.stateOf("opencode"),
+      google: this.stateOf("google"),
     };
   }
 
