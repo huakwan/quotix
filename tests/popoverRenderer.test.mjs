@@ -130,16 +130,32 @@ test("update actions never retain focus", () => {
   assert.match(renderer, /case "download": window\.quotix\.downloadUpdate\(\)/);
 });
 
-test("popover exposes a fixed open-at-login preference action", () => {
-  const renderer = readFileSync(join(root, "src/ui/popover/popoverRenderer.ts"), "utf8");
-  const preload = readFileSync(join(root, "src/ui/popover/preload.ts"), "utf8");
-  const html = readFileSync(join(root, "src/ui/popover/popover.html"), "utf8");
+test("settings window exposes a fixed open-at-login preference action", () => {
+  const renderer = readFileSync(join(root, "src/ui/settings/settingsRenderer.ts"), "utf8");
+  const preload = readFileSync(join(root, "src/ui/settings/settingsPreload.ts"), "utf8");
+  const html = readFileSync(join(root, "src/ui/settings/settings.html"), "utf8");
   const main = readFileSync(join(root, "src/main.ts"), "utf8");
 
   assert.match(html, /id="login-mode"/);
-  assert.match(renderer, /window\.quotix\.setOpenAtLogin\(value === "on"\)/);
+  assert.match(renderer, /window\.settings\.setOpenAtLogin\(value === "on"\)/);
   assert.match(preload, /ipcRenderer\.send\("preferences:setOpenAtLogin", value\)/);
   assert.match(main, /function render\(\)[\s\S]*?refreshOpenAtLoginPreference\(\)/);
+});
+
+test("settings action opens the settings window and uses a narrow preload API", () => {
+  const renderer = readFileSync(join(root, "src/ui/popover/popoverRenderer.ts"), "utf8");
+  const preload = readFileSync(join(root, "src/ui/popover/preload.ts"), "utf8");
+  const settingsPreload = readFileSync(join(root, "src/ui/settings/settingsPreload.ts"), "utf8");
+  const html = readFileSync(join(root, "src/ui/popover/popover.html"), "utf8");
+  const main = readFileSync(join(root, "src/main.ts"), "utf8");
+
+  assert.match(html, /id="settings"[\s\S]*?id="about"/);
+  assert.match(renderer, /window\.quotix\.openSettings\(\)/);
+  assert.match(preload, /ipcRenderer\.send\("settings:open"\)/);
+  assert.doesNotMatch(preload, /ipcRenderer\.send\("settings:close"\)/);
+  assert.match(settingsPreload, /ipcRenderer\.send\("settings:close"\)/);
+  assert.match(main, /ipcMain\.on\("settings:open"/);
+  assert.match(main, /ipcMain\.on\("settings:close"/);
 });
 
 test("about action sits beside refresh and uses a narrow preload API", () => {
@@ -211,4 +227,19 @@ test("error tooltip clamps its height so it cannot spill past the window edge", 
 
   assert.match(tooltip, /-webkit-line-clamp:\s*3/);
   assert.match(tooltip, /overflow:\s*hidden/);
+});
+
+test("settings window displays sources table with popover checkboxes and menu bar radio selection", () => {
+  const html = readFileSync(join(root, "src/ui/settings/settings.html"), "utf8");
+  const renderer = readFileSync(join(root, "src/ui/settings/settingsRenderer.ts"), "utf8");
+
+  assert.match(html, /class="sources-table"/);
+  assert.match(html, /data-provider="claude"/);
+  assert.match(html, /data-provider="codex"/);
+  assert.match(html, /data-provider="opencode"/);
+  assert.match(html, /data-provider="google"/);
+  assert.match(html, /class="source-popover-check"/);
+  assert.match(html, /class="source-menubar-radio"/);
+  assert.match(renderer, /window\.settings\.setSources\(newSources\)/);
+  assert.match(renderer, /window\.settings\.setMenuBarSource\(/);
 });

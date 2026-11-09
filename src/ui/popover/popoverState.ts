@@ -43,6 +43,7 @@ export interface QuotaRow {
   label: string;
   window: QuotaWindow | null;
   periodSeconds: number;
+  group?: string;
 }
 
 export function quotaRowsForProvider(provider: ProviderId, quota: Quota): QuotaRow[] {
@@ -51,8 +52,8 @@ export function quotaRowsForProvider(provider: ProviderId, quota: Quota): QuotaR
       return [...quota.extraRows];
     }
     const rows: QuotaRow[] = [];
-    if (quota.session) { rows.push({ label: "5H", window: quota.session, periodSeconds: FIVE_HOUR_SECONDS }); }
-    if (quota.weekly) { rows.push({ label: "7D", window: quota.weekly, periodSeconds: SEVEN_DAY_SECONDS }); }
+    if (quota.session) { rows.push({ label: "5H", window: quota.session, periodSeconds: FIVE_HOUR_SECONDS, group: "Gemini Models" }); }
+    if (quota.weekly) { rows.push({ label: "7D", window: quota.weekly, periodSeconds: SEVEN_DAY_SECONDS, group: "Gemini Models" }); }
     return rows;
   }
   const rows: QuotaRow[] = [];
@@ -104,6 +105,23 @@ export function showMenuBarSetting(preferences: Preferences): boolean {
 
 export function selectedMenuBarSource(preferences: Preferences): ProviderId {
   return menuBarProvider(preferences.sources, preferences.menuBarSource);
+}
+
+const SHORT_PROVIDER_LABELS: Record<ProviderId, string> = {
+  claude: "Claude",
+  codex: "Codex",
+  opencode: "OpenCode",
+  google: "Google",
+};
+
+export function formatSourceLabel(sources: readonly ProviderId[]): string {
+  if (sources.length === 0) { return "None"; }
+  if (sources.length >= 4) { return "All sources"; }
+  if (sources.length === 1) { return SHORT_PROVIDER_LABELS[sources[0]] ?? sources[0]; }
+  if (sources.length === 2) {
+    return `${SHORT_PROVIDER_LABELS[sources[0]] ?? sources[0]}, ${SHORT_PROVIDER_LABELS[sources[1]] ?? sources[1]}`;
+  }
+  return `${sources.length} sources`;
 }
 
 /** Toggling the last enabled source off is refused; something must stay shown. */

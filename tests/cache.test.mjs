@@ -1,8 +1,6 @@
-import assert from "node:assert/strict";
-
-import test from "node:test";
-
 import { createQuotaCache } from "../out/src/quota/cache.js";
+import assert from "node:assert/strict";
+import test from "node:test";
 
 const quota = {
   updatedAt: 123,
@@ -55,4 +53,19 @@ test("a cache written before the monthly window still loads", () => {
 test("Claude reads the legacy cache when its provider cache is absent", () => {
   const fs = memoryFs({ "/data/quotix-quota-cache.json": JSON.stringify(quota) });
   assert.deepEqual(createQuotaCache("/data", "claude", fs.deps).load(), quota);
+});
+
+test("Google quota cache preserves extraRows and group fields", () => {
+  const googleQuota = {
+    ...quota,
+    extraRows: [
+      { label: "5H", window: { usedPct: 10, resetsAt: 100 }, periodSeconds: 18000, group: "Gemini Models" },
+      { label: "7D", window: { usedPct: 20, resetsAt: 200 }, periodSeconds: 604800, group: "Gemini Models" },
+      { label: "5H", window: { usedPct: 30, resetsAt: 300 }, periodSeconds: 18000, group: "Claude and GPT Models" },
+    ],
+  };
+  const fs = memoryFs();
+  const googleCache = createQuotaCache("/data", "google", fs.deps);
+  googleCache.save(googleQuota);
+  assert.deepEqual(googleCache.load(), googleQuota);
 });

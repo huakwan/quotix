@@ -1,12 +1,8 @@
-import assert from "node:assert/strict";
-import test from "node:test";
-import {
-  parseKeychainSecret,
-  parseFileToken,
-  createCachedGoogleKeyProvider,
-} from "../out/src/quota/google/credentials.js";
+import { parseKeychainSecret, parseFileToken, createCachedGoogleKeyProvider, } from "../out/src/quota/google/credentials.js";
 import { GoogleQuotaProvider } from "../out/src/quota/google/provider.js";
 import { quotaFromGoogleQuotaSummary } from "../out/src/quota/model.js";
+import assert from "node:assert/strict";
+import test from "node:test";
 
 const sampleSummaryResponse = {
   response: {
@@ -86,7 +82,17 @@ test("quotaFromGoogleQuotaSummary maps Gemini, 3P, and Argon buckets", () => {
   // All 5 rows
   assert.ok(quota.extraRows);
   assert.equal(quota.extraRows.length, 5);
-  assert.deepEqual(quota.extraRows.map((r) => r.label), ["5H", "7D", "C 5H", "C 7D", "ARGON"]);
+  assert.deepEqual(quota.extraRows.map((r) => r.label), ["5H", "7D", "5H", "7D", "7D"]);
+  assert.deepEqual(
+    quota.extraRows.map((r) => r.group),
+    [
+      "Gemini Models",
+      "Gemini Models",
+      "Claude and GPT Models",
+      "Claude and GPT Models",
+      "Gemini 4 Argon Models",
+    ],
+  );
 
   assert.equal(quota.extraRows[0].window?.usedPct, 10);
   assert.equal(quota.extraRows[0].periodSeconds, 5 * 3600);
@@ -255,4 +261,3 @@ test("GoogleQuotaProvider maps 401, 403, 429, and network error", async () => {
     assert.equal(r429.retryAfterSeconds, 60);
   }
 });
-

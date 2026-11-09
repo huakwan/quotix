@@ -1,6 +1,15 @@
-import { canActivateUpdateAction, diagnosticText, isQuotaRefreshInProgress, quotaRowsForProvider, sectionsForPayload, selectedMenuBarSource, showMenuBarSetting, toggledSources, updatePresentation, type PopoverPayload, type UpdateAction, } from "./popoverState";
+import {
+  canActivateUpdateAction,
+  diagnosticText,
+  isQuotaRefreshInProgress,
+  quotaRowsForProvider,
+  sectionsForPayload,
+  updatePresentation,
+  type PopoverPayload,
+  type QuotaRow,
+  type UpdateAction,
+} from "./popoverState";
 import type { ProviderId, QuotaWindow, SourceState } from "../../quota/model";
-import { isProviderId } from "../../quota/model";
 import { PROVIDER_LOGOS, logoNeedsInverting } from "../branding";
 import { keepButtonsUnfocused } from "../buttonFocus";
 import type { ResetMode, TrayIconColor } from "../../preferences";
@@ -16,6 +25,7 @@ declare global {
     setOpenAtLogin(value: boolean): void;
     refresh(): Promise<void>;
     openAbout(): void;
+    openSettings(): void;
     checkForUpdates(): void;
     downloadUpdate(): void;
     cancelUpdate(): void;
@@ -159,52 +169,57 @@ function rowHtml(
     + `<div class="reset">${resetText(window.resetsAt, nowSec, mode)}</div></div>`;
 }
 
+function renderRowsHtml(rows: QuotaRow[], payload: PopoverPayload): string {
+  const hasGroups = rows.some((r) => Boolean(r.group));
+  if (!hasGroups) {
+    return rows
+      .map((row) => rowHtml(
+        row.label, row.window, row.periodSeconds, payload.nowSec, payload.preferences.resetMode, payload.preferences.showPaceLine,
+      ))
+      .join("");
+  }
+
+  const groups: { name?: string; rows: QuotaRow[] }[] = [];
+  for (const row of rows) {
+    const current = groups[groups.length - 1];
+    if (current && current.name === row.group) {
+      current.rows.push(row);
+    } else {
+      groups.push({ name: row.group, rows: [row] });
+    }
+  }
+
+  return groups
+    .map((g) => {
+      const items = g.rows
+        .map((row) => rowHtml(
+          row.label, row.window, row.periodSeconds, payload.nowSec, payload.preferences.resetMode, payload.preferences.showPaceLine,
+        ))
+        .join("");
+      if (!g.name) {
+        return items;
+      }
+      return `<div class="sub-group"><div class="sub-header"><span>${escapeHtml(g.name)}</span></div>${items}</div>`;
+    })
+    .join("");
+}
+
 function sectionHtml(provider: ProviderId, name: string, state: SourceState, payload: PopoverPayload): string {
   const logo = PROVIDER_LOGOS[provider];
   const logoClass = logoNeedsInverting(provider) ? "logo monochrome-logo" : "logo";
   const quota = state.lastGood ?? (state.result.ok ? state.result.quota : null);
   const body = quota
-    ? quotaRowsForProvider(provider, quota)
-      .map((row) => rowHtml(
-        row.label, row.window, row.periodSeconds, payload.nowSec, payload.preferences.resetMode, payload.preferences.showPaceLine,
-      ))
-      .join("")
+    ? renderRowsHtml(quotaRowsForProvider(provider, quota), payload)
       + updatedLine(quota, state, payload.nowSec)
     : `<div class="unavailable">${unavailableMessage(provider, state)}</div>`;
   return `<section class="source-section"><div class="header"><img class="${logoClass}" src="${logo}" alt=""/>`
     + `<span>${name}</span></div>${body}</section>`;
 }
 
-function syncButtons(containerId: string, value: string): void {
-  const container = document.getElementById(containerId)!;
-  for (const button of container.querySelectorAll<HTMLButtonElement>(".seg-btn")) {
-    button.classList.toggle("active", button.dataset.value === value);
-  }
-}
-
-// The source row is a multi-select, and the menu-bar row only offers what the
-// source row enabled, so both are driven off the enabled set rather than one value.
-function syncSourceButtons(sources: readonly ProviderId[], menuBarSource: ProviderId): void {
-  for (const button of document.querySelectorAll<HTMLButtonElement>("#source-mode .chip-btn, #source-mode .seg-btn")) {
-    button.classList.toggle("active", sources.includes(button.dataset.value as ProviderId));
-  }
-  for (const button of document.querySelectorAll<HTMLButtonElement>("#menu-source .seg-btn")) {
-    const provider = button.dataset.value as ProviderId;
-    button.classList.toggle("hidden", !sources.includes(provider));
-    button.classList.toggle("active", provider === menuBarSource);
-  }
-}
-
 function draw(): void {
   if (!last) { return; }
   document.getElementById("sources")!.innerHTML = sectionsForPayload(last)
     .map((section) => sectionHtml(section.provider, section.name, section.state, last!)).join("");
-  syncSourceButtons(last.preferences.sources, selectedMenuBarSource(last.preferences));
-  syncButtons("reset-mode", last.preferences.resetMode);
-  syncButtons("pace-mode", last.preferences.showPaceLine ? "on" : "off");
-  syncButtons("tray-icon-color", last.preferences.trayIconColor);
-  syncButtons("login-mode", last.preferences.openAtLogin ? "on" : "off");
-  document.getElementById("menu-source-row")!.classList.toggle("hidden", !showMenuBarSetting(last.preferences));
   const refreshButton = document.getElementById("refresh")! as HTMLButtonElement;
   refreshButton.disabled = refreshPending || isQuotaRefreshInProgress(last);
   refreshButton.title = refreshButton.disabled ? "Refreshing…" : "Refresh now";
@@ -230,29 +245,9 @@ function draw(): void {
   updateProgressFill.style.width = `${progress}%`;
 }
 
-function onSegment(id: string, callback: (value: string) => void): void {
-  document.getElementById(id)!.addEventListener("click", (event) => {
-    const button = (event.target as HTMLElement).closest<HTMLButtonElement>(".seg-btn, .chip-btn");
-    if (button?.dataset.value) { callback(button.dataset.value); }
-  });
-}
-
 window.quotix.onUpdate((payload) => { last = payload; draw(); });
 keepButtonsUnfocused();
-onSegment("source-mode", (value) => {
-  if (!last || !isProviderId(value)) { return; }
-  const sources = toggledSources(last.preferences.sources, value);
-  if (!sources) { return; }
-  // Paint the new selection now; the main process echoes it back on the next update.
-  last = { ...last, preferences: { ...last.preferences, sources } };
-  draw();
-  window.quotix.setSources(sources);
-});
-onSegment("menu-source", (value) => window.quotix.setMenuBarSource(value as ProviderId));
-onSegment("reset-mode", (value) => window.quotix.setResetMode(value as ResetMode));
-onSegment("pace-mode", (value) => window.quotix.setShowPaceLine(value === "on"));
-onSegment("tray-icon-color", (value) => window.quotix.setTrayIconColor(value as TrayIconColor));
-onSegment("login-mode", (value) => window.quotix.setOpenAtLogin(value === "on"));
+
 const refreshButton = document.getElementById("refresh")! as HTMLButtonElement;
 refreshButton.addEventListener("click", () => {
   if (refreshPending) { return; }
@@ -265,6 +260,7 @@ refreshButton.addEventListener("click", () => {
       draw();
     });
 });
+document.getElementById("settings")!.addEventListener("click", () => window.quotix.openSettings());
 document.getElementById("about")!.addEventListener("click", () => window.quotix.openAbout());
 const updateActionButton = document.getElementById("update-action")!;
 updateActionButton.addEventListener("click", (event) => {

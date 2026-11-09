@@ -1,0 +1,375 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self'"
+    />
+    <style>
+      :root {
+        --fg: rgba(255, 255, 255, 0.94);
+        --muted: rgba(255, 255, 255, 0.52);
+        --track: rgba(255, 255, 255, 0.18);
+        --separator: rgba(255, 255, 255, 0.16);
+        --control: rgba(255, 255, 255, 0.12);
+        --control-hover: rgba(255, 255, 255, 0.18);
+        --selected-control: rgba(255, 255, 255, 0.35);
+        --selected-border: rgba(0, 0, 0, 0.32);
+        --selected-shadow: rgba(0, 0, 0, 0.28);
+        --panel-bg: rgba(28, 28, 30, 0.85);
+        --window-border: rgba(255, 255, 255, 0.14);
+      }
+
+      @media (prefers-color-scheme: light) {
+        :root {
+          --fg: #000000;
+          --muted: rgba(40, 40, 46, 0.95);
+          --track: rgba(60, 60, 67, 0.26);
+          --separator: rgba(60, 60, 67, 0.26);
+          --control: rgba(118, 118, 128, 0.24);
+          --control-hover: rgba(118, 118, 128, 0.3);
+          --selected-control: rgba(255, 255, 255, 0.4);
+          --selected-border: rgba(0, 0, 0, 0.08);
+          --selected-shadow: rgba(0, 0, 0, 0.1);
+          --panel-bg: rgba(242, 242, 247, 0.85);
+          --window-border: rgba(0, 0, 0, 0.12);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        width: 100%;
+        background: transparent;
+        overflow: hidden;
+        scrollbar-width: none;
+        font:
+          12px -apple-system,
+          system-ui,
+          sans-serif;
+        color: var(--fg);
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      ::-webkit-scrollbar {
+        width: 0;
+        height: 0;
+        background: transparent;
+      }
+      .window {
+        display: flex;
+        flex-direction: column;
+        background: var(--panel-bg);
+        border: 1px solid var(--window-border);
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+      }
+      .title-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 14px 8px 14px;
+        border-bottom: 1px solid var(--separator);
+        -webkit-app-region: drag;
+      }
+      .title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--fg);
+      }
+      .close-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 5px;
+        border: 0;
+        background: none;
+        color: var(--muted);
+        cursor: pointer;
+        -webkit-app-region: no-drag;
+        transition:
+          background 0.12s,
+          color 0.12s;
+      }
+      .close-btn:hover {
+        background: var(--control-hover);
+        color: var(--fg);
+      }
+      .close-btn svg {
+        width: 12px;
+        height: 12px;
+      }
+      .content {
+        overflow: hidden;
+        padding: 14px;
+        -webkit-app-region: no-drag;
+      }
+      /* Sources Selection Table */
+      .sources-table-container {
+        margin: 4px 0 10px 0;
+        background: var(--control);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .sources-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+      }
+      .sources-table th {
+        padding: 7px 10px;
+        text-align: left;
+        font-weight: 600;
+        color: var(--muted);
+        border-bottom: 1px solid var(--separator);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .sources-table th.col-check,
+      .sources-table th.col-radio {
+        text-align: center;
+        width: 75px;
+      }
+      .sources-table td {
+        padding: 7px 10px;
+        border-bottom: 1px solid var(--separator);
+        color: var(--fg);
+      }
+      .sources-table tr:last-child td {
+        border-bottom: 0;
+      }
+      .sources-table td.col-check,
+      .sources-table td.col-radio {
+        text-align: center;
+      }
+      .sources-table td.col-source {
+        font-weight: 500;
+      }
+      .sources-table input[type="checkbox"],
+      .sources-table input[type="radio"] {
+        cursor: pointer;
+        width: 14px;
+        height: 14px;
+        margin: 0;
+        accent-color: #007aff;
+        vertical-align: middle;
+      }
+      .sources-table tr:hover {
+        background: var(--control-hover);
+      }
+      .divider {
+        height: 1px;
+        background: var(--separator);
+        margin: 12px 0;
+      }
+      .setting-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin: 10px 0;
+      }
+      .s-label {
+        color: var(--muted);
+        font-weight: 600;
+      }
+      .segmented {
+        display: flex;
+        padding: 2px;
+        border-radius: 7px;
+        background: var(--control);
+      }
+      .seg-btn {
+        border: 0;
+        background: none;
+        color: var(--muted);
+        font: inherit;
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.01em;
+        padding: 3px 11px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          color 0.15s ease,
+          box-shadow 0.15s ease;
+      }
+      .seg-btn:hover:not(.active) {
+        background: var(--control-hover);
+        color: var(--fg);
+      }
+      .seg-btn.active {
+        background: var(--selected-control);
+        color: var(--fg);
+        font-weight: 600;
+        box-shadow:
+          0 1px 2px var(--selected-shadow),
+          0 0 0 0.5px var(--selected-border);
+      }
+      .seg-btn:focus {
+        outline: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="window">
+      <div class="title-bar">
+        <span class="title">Settings</span>
+        <button class="close-btn" id="close" title="Close" type="button" tabindex="-1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="content">
+        <div class="sources-table-container">
+          <table class="sources-table">
+            <thead>
+              <tr>
+                <th class="col-source">Source</th>
+                <th class="col-check">Popover</th>
+                <th class="col-radio">Menu bar</th>
+              </tr>
+            </thead>
+            <tbody id="sources-table-body">
+              <tr data-provider="claude">
+                <td class="col-source">Claude</td>
+                <td class="col-check">
+                  <input
+                    type="checkbox"
+                    class="source-popover-check"
+                    data-value="claude"
+                    tabindex="-1"
+                    title="Show Claude in Popover"
+                  />
+                </td>
+                <td class="col-radio">
+                  <input
+                    type="radio"
+                    name="menu-bar-source"
+                    class="source-menubar-radio"
+                    data-value="claude"
+                    tabindex="-1"
+                    title="Show Claude in Menu bar"
+                  />
+                </td>
+              </tr>
+              <tr data-provider="codex">
+                <td class="col-source">Codex</td>
+                <td class="col-check">
+                  <input
+                    type="checkbox"
+                    class="source-popover-check"
+                    data-value="codex"
+                    tabindex="-1"
+                    title="Show Codex in Popover"
+                  />
+                </td>
+                <td class="col-radio">
+                  <input
+                    type="radio"
+                    name="menu-bar-source"
+                    class="source-menubar-radio"
+                    data-value="codex"
+                    tabindex="-1"
+                    title="Show Codex in Menu bar"
+                  />
+                </td>
+              </tr>
+              <tr data-provider="opencode">
+                <td class="col-source">OpenCode</td>
+                <td class="col-check">
+                  <input
+                    type="checkbox"
+                    class="source-popover-check"
+                    data-value="opencode"
+                    tabindex="-1"
+                    title="Show OpenCode in Popover"
+                  />
+                </td>
+                <td class="col-radio">
+                  <input
+                    type="radio"
+                    name="menu-bar-source"
+                    class="source-menubar-radio"
+                    data-value="opencode"
+                    tabindex="-1"
+                    title="Show OpenCode in Menu bar"
+                  />
+                </td>
+              </tr>
+              <tr data-provider="google">
+                <td class="col-source">Google</td>
+                <td class="col-check">
+                  <input
+                    type="checkbox"
+                    class="source-popover-check"
+                    data-value="google"
+                    tabindex="-1"
+                    title="Show Google in Popover"
+                  />
+                </td>
+                <td class="col-radio">
+                  <input
+                    type="radio"
+                    name="menu-bar-source"
+                    class="source-menubar-radio"
+                    data-value="google"
+                    tabindex="-1"
+                    title="Show Google in Menu bar"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="divider"></div>
+        <div class="setting-row">
+          <span class="s-label">Reset time</span>
+          <div class="segmented" id="reset-mode">
+            <button class="seg-btn" data-value="countdown" tabindex="-1">
+              Countdown
+            </button>
+            <button class="seg-btn" data-value="clock" tabindex="-1">
+              Clock
+            </button>
+          </div>
+        </div>
+        <div class="setting-row">
+          <span class="s-label">Pace line</span>
+          <div class="segmented" id="pace-mode">
+            <button class="seg-btn" data-value="on" tabindex="-1">On</button>
+            <button class="seg-btn" data-value="off" tabindex="-1">Off</button>
+          </div>
+        </div>
+        <div class="setting-row">
+          <span class="s-label">Icon color</span>
+          <div class="segmented" id="tray-icon-color">
+            <button class="seg-btn" data-value="auto" tabindex="-1">Auto</button>
+            <button class="seg-btn" data-value="light" tabindex="-1">Light</button>
+            <button class="seg-btn" data-value="dark" tabindex="-1">Dark</button>
+          </div>
+        </div>
+        <div class="setting-row">
+          <span class="s-label">Open at login</span>
+          <div class="segmented" id="login-mode">
+            <button class="seg-btn" data-value="on" tabindex="-1">On</button>
+            <button class="seg-btn" data-value="off" tabindex="-1">Off</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="settingsRenderer.js"></script>
+  </body>
+</html>

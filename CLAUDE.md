@@ -56,8 +56,8 @@ root and all quota data flows through a provider framework:
    overrides the tray glyph color, because nativeTheme reports the app appearance
    and some machines render the menu bar the other way.
    Adding a source should only mean a new id in `PROVIDER_IDS` plus a runtime
-   factory, a logo, and a button in the popover rows.
-9. `src/ui/` — pure tray/popover selectors plus Electron/DOM renderers.
+   factory, a logo, and an option in the settings rows.
+9. `src/ui/` — pure tray/popover/settings selectors plus Electron/DOM renderers.
    `src/ui/branding.ts` maps a provider to its label, its asset, and whether its
    mark is a black glyph that needs inverting in dark mode.
 

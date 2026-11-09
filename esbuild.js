@@ -11,6 +11,7 @@ const copyHtml = {
       mkdirSync("dist", { recursive: true });
       copyFileSync("src/ui/popover/popover.html", "dist/popover.html");
       copyFileSync("src/ui/about/about.html", "dist/about.html");
+      copyFileSync("src/ui/settings/settings.html", "dist/settings.html");
     });
   },
 };
@@ -35,6 +36,11 @@ async function main() {
       outfile: "dist/aboutPreload.js",
     }),
     esbuild.context({
+      ...node,
+      entryPoints: ["src/ui/settings/settingsPreload.ts"],
+      outfile: "dist/settingsPreload.js",
+    }),
+    esbuild.context({
       entryPoints: ["src/ui/popover/popoverRenderer.ts"], outfile: "dist/popoverRenderer.js",
       bundle: true, format: "iife", platform: "browser", target: "es2020",
       define: { __APP_VERSION__: JSON.stringify(pkg.version) },
@@ -42,6 +48,12 @@ async function main() {
     }),
     esbuild.context({
       entryPoints: ["src/ui/about/aboutRenderer.ts"], outfile: "dist/aboutRenderer.js",
+      bundle: true, format: "iife", platform: "browser", target: "es2020",
+      define: { __APP_VERSION__: JSON.stringify(pkg.version) },
+      sourcemap: true, logLevel: "info",
+    }),
+    esbuild.context({
+      entryPoints: ["src/ui/settings/settingsRenderer.ts"], outfile: "dist/settingsRenderer.js",
       bundle: true, format: "iife", platform: "browser", target: "es2020",
       define: { __APP_VERSION__: JSON.stringify(pkg.version) },
       sourcemap: true, logLevel: "info",

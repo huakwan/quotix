@@ -89,6 +89,34 @@
         margin-top: 12px;
         padding-top: 12px;
       }
+      .sub-group {
+        margin-top: 6px;
+      }
+      .sub-group:first-of-type {
+        margin-top: 0;
+      }
+      .sub-group + .sub-group {
+        margin-top: 12px;
+      }
+      .sub-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--muted);
+        white-space: nowrap;
+        margin-bottom: 2px;
+      }
+      .sub-header span {
+        flex-shrink: 0;
+      }
+      .sub-header::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--separator);
+      }
       .header .logo {
         width: 16px;
         height: 16px;
@@ -207,133 +235,6 @@
         height: 1px;
         background: var(--separator);
         margin: 10px 0;
-      }
-      .divider2 {
-        height: 1px;
-        background: var(--separator);
-        margin: 16px 0;
-      }
-      .settings {
-        padding-bottom: 2px;
-      }
-      .setting-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        margin: 6px 0;
-      }
-      .setting-row.stacked {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 5px;
-        margin: 8px 0;
-      }
-      .setting-row .s-label {
-        color: var(--muted);
-        font-weight: 600;
-      }
-      .setting-row.stacked .s-label {
-        font-size: 11px;
-      }
-      .segmented {
-        display: flex;
-        padding: 2px;
-        border-radius: 7px;
-        background: var(--control);
-      }
-      .seg-btn {
-        border: 0;
-        background: none;
-        color: var(--muted);
-        font: inherit;
-        font-size: 11px;
-        font-weight: 500;
-        letter-spacing: 0.01em;
-        padding: 3px 11px;
-        border-radius: 5px;
-        cursor: pointer;
-        transition:
-          background 0.15s ease,
-          color 0.15s ease,
-          box-shadow 0.15s ease;
-      }
-      .seg-btn:hover:not(.active) {
-        background: var(--control-hover);
-        color: var(--fg);
-      }
-      .seg-btn.active {
-        background: var(--selected-control);
-        color: var(--fg);
-        font-weight: 600;
-        box-shadow:
-          0 1px 2px var(--selected-shadow),
-          0 0 0 0.5px var(--selected-border);
-      }
-      /* The provider rows carry one button per source, spanning the full width
-         so every button has equal breathing room and never overflows. */
-      .segmented.provider-modes {
-        width: 100%;
-        display: flex;
-      }
-      .segmented.provider-modes .seg-btn {
-        flex: 1;
-        text-align: center;
-        padding: 4px 2px;
-        letter-spacing: 0;
-      }
-      .seg-btn:focus {
-        outline: none;
-      }
-      /* Multi-select chips for sources: independent pill buttons with checkmark */
-      .chips-group {
-        display: flex;
-        gap: 5px;
-        width: 100%;
-      }
-      .chip-btn {
-        flex: 1;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 3px;
-        border: 0;
-        background: var(--control);
-        color: var(--muted);
-        font: inherit;
-        font-size: 11px;
-        font-weight: 500;
-        letter-spacing: 0;
-        padding: 4px 2px;
-        border-radius: 6px;
-        cursor: pointer;
-        transition:
-          background 0.15s ease,
-          color 0.15s ease,
-          box-shadow 0.15s ease;
-      }
-      .chip-btn:hover:not(.active) {
-        background: var(--control-hover);
-        color: var(--fg);
-      }
-      .chip-btn.active {
-        background: var(--selected-control);
-        color: var(--fg);
-        font-weight: 600;
-        box-shadow:
-          0 1px 2px var(--selected-shadow),
-          0 0 0 0.5px var(--selected-border);
-      }
-      .chip-check {
-        display: none;
-        font-size: 10px;
-        line-height: 1;
-      }
-      .chip-btn.active .chip-check {
-        display: inline-block;
-      }
-      .chip-btn:focus {
-        outline: none;
       }
       .footer {
         display: flex;
@@ -460,76 +361,6 @@
   <body>
     <div class="panel">
       <div id="sources"></div>
-      <div class="divider2"></div>
-      <div class="settings">
-        <div class="setting-row stacked">
-          <span class="s-label">Source</span>
-          <div class="chips-group" id="source-mode">
-            <button class="chip-btn" data-value="claude" tabindex="-1">
-              <span class="chip-check">✓</span>Claude
-            </button>
-            <button class="chip-btn" data-value="codex" tabindex="-1">
-              <span class="chip-check">✓</span>Codex
-            </button>
-            <button class="chip-btn" data-value="opencode" tabindex="-1">
-              <span class="chip-check">✓</span>OpenCode
-            </button>
-            <button class="chip-btn" data-value="google" tabindex="-1">
-              <span class="chip-check">✓</span>Google
-            </button>
-          </div>
-        </div>
-        <div class="setting-row stacked" id="menu-source-row">
-          <span class="s-label">Menu bar</span>
-          <div class="segmented provider-modes" id="menu-source">
-            <button class="seg-btn" data-value="claude" tabindex="-1">
-              Claude
-            </button>
-            <button class="seg-btn" data-value="codex" tabindex="-1">
-              Codex
-            </button>
-            <button class="seg-btn" data-value="opencode" tabindex="-1">
-              OpenCode
-            </button>
-            <button class="seg-btn" data-value="google" tabindex="-1">
-              Google
-            </button>
-          </div>
-        </div>
-        <div class="setting-row">
-          <span class="s-label">Reset time</span>
-          <div class="segmented" id="reset-mode">
-            <button class="seg-btn" data-value="countdown" tabindex="-1">
-              Countdown
-            </button>
-            <button class="seg-btn" data-value="clock" tabindex="-1">
-              Clock
-            </button>
-          </div>
-        </div>
-        <div class="setting-row">
-          <span class="s-label">Pace line</span>
-          <div class="segmented" id="pace-mode">
-            <button class="seg-btn" data-value="on" tabindex="-1">On</button>
-            <button class="seg-btn" data-value="off" tabindex="-1">Off</button>
-          </div>
-        </div>
-        <div class="setting-row">
-          <span class="s-label">Icon color</span>
-          <div class="segmented" id="tray-icon-color">
-            <button class="seg-btn" data-value="auto" tabindex="-1">Auto</button>
-            <button class="seg-btn" data-value="light" tabindex="-1">Light</button>
-            <button class="seg-btn" data-value="dark" tabindex="-1">Dark</button>
-          </div>
-        </div>
-        <div class="setting-row">
-          <span class="s-label">Open at login</span>
-          <div class="segmented" id="login-mode">
-            <button class="seg-btn" data-value="on" tabindex="-1">On</button>
-            <button class="seg-btn" data-value="off" tabindex="-1">Off</button>
-          </div>
-        </div>
-      </div>
       <div class="divider"></div>
       <div class="update-row hidden" id="update-row">
         <div class="update-copy">
@@ -556,6 +387,17 @@
       <div class="footer">
         <span class="version" id="version"></span>
         <div class="actions">
+          <button
+            class="icon-btn"
+            id="settings"
+            title="Settings"
+            tabindex="-1"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </button>
           <button
             class="icon-btn"
             id="about"

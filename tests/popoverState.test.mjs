@@ -1,4 +1,4 @@
-import { canActivateUpdateAction, diagnosticText, isQuotaRefreshInProgress, monthlyPeriodSeconds, quotaRowsForProvider, sectionsForPayload, selectedMenuBarSource, showMenuBarSetting, toggledSources, updatePresentation, } from "../out/src/ui/popover/popoverState.js";
+import { canActivateUpdateAction, diagnosticText, formatSourceLabel, isQuotaRefreshInProgress, monthlyPeriodSeconds, quotaRowsForProvider, sectionsForPayload, selectedMenuBarSource, showMenuBarSetting, toggledSources, updatePresentation, } from "../out/src/ui/popover/popoverState.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -72,6 +72,18 @@ test("toggling adds in presentation order, removes, and refuses to empty the lis
   assert.equal(toggledSources(["codex"], "codex"), null);
 });
 
+test("formatSourceLabel presents human-readable label for single, pair, multiple, or all sources", () => {
+  assert.equal(formatSourceLabel(["claude", "codex", "opencode", "google"]), "All sources");
+  assert.equal(formatSourceLabel(["claude"]), "Claude");
+  assert.equal(formatSourceLabel(["codex"]), "Codex");
+  assert.equal(formatSourceLabel(["opencode"]), "OpenCode");
+  assert.equal(formatSourceLabel(["google"]), "Google");
+  assert.equal(formatSourceLabel(["claude", "codex"]), "Claude, Codex");
+  assert.equal(formatSourceLabel(["claude", "google"]), "Claude, Google");
+  assert.equal(formatSourceLabel(["claude", "codex", "opencode"]), "3 sources");
+  assert.equal(formatSourceLabel([]), "None");
+});
+
 test("refresh progress follows only enabled source sections", () => {
   const both = payload("claude", "codex", "opencode");
   both.snapshot.codex.loading = true;
@@ -140,7 +152,7 @@ test("an absent OpenCode Go monthly window still renders its row", () => {
   assert.deepEqual(rows.map((row) => row.window), [null, null, null]);
 });
 
-test("Google AI Pro renders extraRows for multi-model quotas", () => {
+test("Google AI renders extraRows for multi-model quotas", () => {
   const rows = quotaRowsForProvider("google", {
     updatedAt: 100,
     session: { usedPct: 10, resetsAt: 200 },
@@ -148,15 +160,22 @@ test("Google AI Pro renders extraRows for multi-model quotas", () => {
     monthly: null,
     weeklyModels: [],
     extraRows: [
-      { label: "5H", window: { usedPct: 10, resetsAt: 200 }, periodSeconds: 18000 },
-      { label: "7D", window: { usedPct: 20, resetsAt: 300 }, periodSeconds: 604800 },
-      { label: "C 5H", window: { usedPct: 0, resetsAt: 400 }, periodSeconds: 18000 },
-      { label: "C 7D", window: { usedPct: 0, resetsAt: 500 }, periodSeconds: 604800 },
-      { label: "ARGON", window: { usedPct: 27, resetsAt: 600 }, periodSeconds: 604800 },
+      { label: "5H", window: { usedPct: 10, resetsAt: 200 }, periodSeconds: 18000, group: "Gemini Models" },
+      { label: "7D", window: { usedPct: 20, resetsAt: 300 }, periodSeconds: 604800, group: "Gemini Models" },
+      { label: "5H", window: { usedPct: 0, resetsAt: 400 }, periodSeconds: 18000, group: "Claude and GPT Models" },
+      { label: "7D", window: { usedPct: 0, resetsAt: 500 }, periodSeconds: 604800, group: "Claude and GPT Models" },
+      { label: "7D", window: { usedPct: 27, resetsAt: 600 }, periodSeconds: 604800, group: "Gemini 4 Argon Models" },
     ],
     planDetected: true,
   });
-  assert.deepEqual(rows.map((r) => r.label), ["5H", "7D", "C 5H", "C 7D", "ARGON"]);
+  assert.deepEqual(rows.map((r) => r.label), ["5H", "7D", "5H", "7D", "7D"]);
+  assert.deepEqual(rows.map((r) => r.group), [
+    "Gemini Models",
+    "Gemini Models",
+    "Claude and GPT Models",
+    "Claude and GPT Models",
+    "Gemini 4 Argon Models",
+  ]);
   assert.equal(rows[4].window.usedPct, 27);
 });
 

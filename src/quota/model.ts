@@ -12,6 +12,7 @@ export interface QuotaRow {
   label: string;
   window: QuotaWindow | null;
   periodSeconds: number;
+  group?: string;
 }
 
 export interface Quota {
@@ -199,7 +200,11 @@ export function quotaFromOpenCodeUsage(payload: unknown, updatedAt: number): Quo
 
 const FIVE_HOUR_SECONDS = 5 * 3600;
 const SEVEN_DAY_SECONDS = 7 * 24 * 3600;
-const GOOGLE_ROW_ORDER: readonly string[] = ["5H", "7D", "C 5H", "C 7D", "ARGON"];
+export const GOOGLE_GROUPS: readonly string[] = [
+  "Gemini Models",
+  "Claude and GPT Models",
+  "Gemini 4 Argon Models",
+];
 
 export function quotaFromGoogleQuotaSummary(payload: unknown, updatedAt: number): Quota {
   const root = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
@@ -231,16 +236,16 @@ export function quotaFromGoogleQuotaSummary(payload: unknown, updatedAt: number)
       const isFiveHour = windowStr === "5h" || bucketId.includes("5h");
       const periodSeconds = isFiveHour ? FIVE_HOUR_SECONDS : SEVEN_DAY_SECONDS;
 
-      let label: string;
       const lowerGroup = groupName.toLowerCase();
       const lowerBucket = bucketId.toLowerCase();
 
+      let rowGroup: string;
       if (lowerGroup.includes("argon") || lowerBucket.includes("argon")) {
-        label = "ARGON";
-      } else if (lowerGroup.includes("claude") || lowerGroup.includes("gpt") || lowerBucket.includes("3p")) {
-        label = isFiveHour ? "C 5H" : "C 7D";
+        rowGroup = "Gemini 4 Argon Models";
+      } else if (lowerGroup.includes("claude") || lowerGroup.includes("gpt") || lowerBucket.includes("3p") || lowerGroup.includes("openai")) {
+        rowGroup = "Claude and GPT Models";
       } else {
-        label = isFiveHour ? "5H" : "7D";
+        rowGroup = "Gemini Models";
         if (isFiveHour && session === null) {
           session = window;
         } else if (!isFiveHour && weekly === null) {
@@ -248,18 +253,22 @@ export function quotaFromGoogleQuotaSummary(payload: unknown, updatedAt: number)
         }
       }
 
-      extraRows.push({ label, window, periodSeconds });
+      const label = isFiveHour ? "5H" : "7D";
+      extraRows.push({ label, window, periodSeconds, group: rowGroup });
     }
   }
 
-  // Sort rows in a consistent presentation order
+  // Sort rows in a consistent presentation order: groups first, then 5H before 7D
   extraRows.sort((a, b) => {
-    const ai = GOOGLE_ROW_ORDER.indexOf(a.label);
-    const bi = GOOGLE_ROW_ORDER.indexOf(b.label);
-    if (ai !== -1 && bi !== -1) { return ai - bi; }
-    if (ai !== -1) { return -1; }
-    if (bi !== -1) { return 1; }
-    return a.label.localeCompare(b.label);
+    const ag = a.group ? GOOGLE_GROUPS.indexOf(a.group) : -1;
+    const bg = b.group ? GOOGLE_GROUPS.indexOf(b.group) : -1;
+    if (ag !== -1 && bg !== -1 && ag !== bg) { return ag - bg; }
+    if (ag !== -1 && bg === -1) { return -1; }
+    if (ag === -1 && bg !== -1) { return 1; }
+    if (a.group && b.group && a.group !== b.group) {
+      return a.group.localeCompare(b.group);
+    }
+    return a.periodSeconds - b.periodSeconds;
   });
 
   if (session === null && extraRows.length > 0) {

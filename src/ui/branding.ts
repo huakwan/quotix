@@ -5,7 +5,7 @@ export const PROVIDER_LABELS: Record<ProviderId, string> = {
   claude: "Claude Code",
   codex: "Codex OpenAI",
   opencode: "OpenCode Go",
-  google: "Google AI Pro",
+  google: "Google AI",
 };
 
 /**

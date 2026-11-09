@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld("quotix", {
   setOpenAtLogin: (value: boolean): void => { ipcRenderer.send("preferences:setOpenAtLogin", value); },
   refresh: (): Promise<void> => ipcRenderer.invoke("quota:refresh"),
   openAbout: (): void => { ipcRenderer.send("about:open"); },
+  openSettings: (): void => { ipcRenderer.send("settings:open"); },
   checkForUpdates: (): void => { ipcRenderer.send("update:check"); },
   downloadUpdate: (): void => { ipcRenderer.send("update:download"); },
   cancelUpdate: (): void => { ipcRenderer.send("update:cancel"); },

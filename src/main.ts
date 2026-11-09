@@ -59,6 +59,7 @@ import { ReleaseChecker } from "./update/releaseChecker";
 import { stageUpdate } from "./update/stager";
 import updatePublicKey from "./update/key/quotix-update-public.pem";
 import { createAboutWindow } from "./ui/about/aboutWindow";
+import { createSettingsWindow, resizeSettings } from "./ui/settings/settingsWindow";
 
 const REFRESH_INTERVAL_SECONDS = 5 * 60;
 // Spread scheduled polls so we do not land on the same instant as the Claude Code
@@ -77,6 +78,7 @@ if (!hasInstanceLock) { app.quit(); }
 let tray: Tray | undefined;
 let popover: BrowserWindow | undefined;
 let aboutWindow: BrowserWindow | undefined;
+let settingsWindow: BrowserWindow | undefined;
 let coordinator: QuotaCoordinator | undefined;
 let preferences: Preferences;
 let pollTimer: NodeJS.Timeout | undefined;
@@ -140,9 +142,15 @@ function scheduleNextPoll(): void {
   pollTimer = setTimeout(() => { void poll().finally(scheduleNextPoll); }, delay);
 }
 
+function renderSettings(): void {
+  if (!settingsWindow || settingsWindow.isDestroyed()) { return; }
+  settingsWindow.webContents.send("preferences:update", preferences);
+}
+
 function persistPreferences(): void {
   savePreferences(app.getPath("userData"), preferences);
   render();
+  renderSettings();
 }
 
 function showPopoverForUpdate(): void {
@@ -171,6 +179,18 @@ function showAbout(): void {
   aboutWindow.once("closed", () => { aboutWindow = undefined; });
 }
 
+function showSettings(): void {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.show();
+    settingsWindow.focus();
+    renderSettings();
+    return;
+  }
+  settingsWindow = createSettingsWindow();
+  settingsWindow.once("ready-to-show", () => { renderSettings(); });
+  settingsWindow.once("closed", () => { settingsWindow = undefined; });
+}
+
 function registerIpc(): void {
   ipcMain.handle("quota:refresh", async () => {
     const refresh = poll();
@@ -186,6 +206,14 @@ function registerIpc(): void {
       aboutWindow.close();
     }
   });
+  ipcMain.on("settings:open", (event) => {
+    if (popover && event.sender === popover.webContents) { showSettings(); }
+  });
+  ipcMain.on("settings:close", (event) => {
+    if (settingsWindow && !settingsWindow.isDestroyed() && event.sender === settingsWindow.webContents) {
+      settingsWindow.close();
+    }
+  });
   ipcMain.on("update:check", () => checkForUpdates(true));
   ipcMain.on("update:download", () => ignoreUpdateAction(updateCoordinator?.download()));
   ipcMain.on("update:cancel", () => updateCoordinator?.cancel());
@@ -194,6 +222,11 @@ function registerIpc(): void {
   ipcMain.on("popover:resize", (_event, height: unknown) => {
     if (popover && typeof height === "number" && Number.isFinite(height)) {
       resizePopover(popover, height);
+    }
+  });
+  ipcMain.on("settings:resize", (_event, height: unknown) => {
+    if (settingsWindow && typeof height === "number" && Number.isFinite(height)) {
+      resizeSettings(settingsWindow, height);
     }
   });
   ipcMain.on("preferences:setSources", (_event, value: unknown) => {

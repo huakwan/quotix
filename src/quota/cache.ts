@@ -48,10 +48,12 @@ function normExtraRows(value: unknown): QuotaRow[] | undefined {
     const e = entry as Record<string, unknown>;
     if (typeof e.label !== "string") { throw new Error("invalid extra row label"); }
     if (typeof e.periodSeconds !== "number") { throw new Error("invalid extra row period"); }
+    const group = typeof e.group === "string" ? e.group : undefined;
     return {
       label: e.label,
       window: normWindow(e.window),
       periodSeconds: e.periodSeconds,
+      ...(group !== undefined ? { group } : {}),
     };
   });
 }
